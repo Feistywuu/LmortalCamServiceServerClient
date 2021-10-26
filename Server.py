@@ -9,92 +9,75 @@ import io
 from io import IOBase as IO
 import threading
 import socketserver
-
-''' CURRENTLY '''
-# server receives information if there is a break in the client send loop, otherwise receives nothing - why?
-# stuck at self.rfile(), when it stop reading the socket stream?
-# +++++
-# thread gets stuck on socket stream, can dedicate entire thread to socket stream, however we need to pass on the
-#frames to the processing thread. We need some sort of information in bytecode/packet about end of frames.
+import imutils
 
 ' Plan of action'
-#
+# create Handler that creates a thread for each request     - CURRENT
+# create server ui
 
-''' figure out'''
-# whilst one thread is 'stuck' in constant socket-stream, is that data availabe to other threads?
-# If data is received in a big chunk, there has to be some frame-data/header information to signify the end of a
-#frame?
+''' Figure Out '''
+#how to break the program
 
-# One thread listens for server-user events and client requests, and spawns handler thread upon accepting request
-#/Server type create a thread for each request
-# If using TCP stream socket, will need to create child process/thread for each client connection.
-# put time in client udp packets to control framerate
-# remember double-buffering,
+BUFF_SIZE = 65536
+server_socket = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+server_socket.setsockopt(socket.SOL_SOCKET, socket.SO_RCVBUF, BUFF_SIZE)
+host_name = socket.gethostname()
+host_ip = socket.gethostbyname(host_name)
+print(host_ip)
+port = 9999
 
-#can use lower level socket module to define headers in UDP packets, to contain information on fps(?)
+socket_address = (host_ip, port)
+server_socket.bind(socket_address)
+print('Listening at:', socket_address)
 
-#listen while loop, to spawn thread for socket connecting
 
-# can use handle_one_request to send to do() function
+def request_handler():
+    threads = []
+    #listens to connection from client, upon receiving, kill connection,
+    # create thread and listen again for connection, upon confirming the same, handle
+    # - will listening in first half pick-up a socket connecting in another thread?
+    #OR
+    # listen for request, if received, stop listening.
+    # create thread and send task of listening to that thread
 
-# create thread upon accepting client request
-#socketserver.StreamRequestHandler
-class HandlerClass(socketserver.StreamRequestHandler):
+    ' If multiple connections to single socket'
+    # handler can establish connection and then append to a list(buffer) which is defined by sender's address.
+    #Spawn a thread to deal with data in each buffer and show on screen.
 
-    def handle(self):
+    # will create thread and execute handle() function upon receiving request
+    pass
 
-        fps, st, frames_to_count, cnt = (0, 0, 20, 0)
-        print('hello?')
-        while True:
-            print('hi')
-            self.data = self.request.recv(1024).strip()
-            #self.data = self.rfile.readline().strip()
-            print('hi2')
-            print("{} wrote:".format(self.client_address[0]))
-            print(self.data)
-            data = base64.b64decode(self.data)
-            print(data)
-            npdata = np.frombuffer(data, dtype=np.uint8)
-            print(npdata)
-            frame = cv.imdecode(npdata, 1)
-            print(frame)
-            frame = cv.putText(frame, 'FPS: ' + str(fps), (10, 40), cv.FONT_HERSHEY_SIMPLEX, 0.7, (0, 0, 255), 2)
-            cv.imshow("RECEIVING VIDEO", frame)
-            key = cv.waitKey(1) & 0xFF
-            if key == ord('q'):
-                HandlerClass.finish(self)
-                break
-            if cnt == frames_to_count:
-                try:
-                    fps = round(frames_to_count / (time.time() - st))
-                    st = time.time()
-                    cnt = 0
-                except:
-                    pass
-            cnt += 1
-            time.sleep(2.0)
 
-                # Likewise, self.wfile is a file-like object used to write back
-                # to the client
-                #self.wfile.write(self.data.upper())
+def handle(client_address=None):
 
-        print('test')
+    fps, st, frames_to_count, cnt = (0, 0, 20, 0)
+    while True:
+        print('ready to receive')
+        packet, _ = server_socket.recvfrom(BUFF_SIZE)
+        print('hi')
+        print(packet)
+        data = base64.b64decode(packet, ' /')
+        npdata = np.fromstring(data, dtype=np.uint8)
+        frame = cv.imdecode(npdata, 1)
+        frame = cv.putText(frame, 'FPS: ' + str(fps), (10, 40), cv.FONT_HERSHEY_SIMPLEX, 0.7, (0, 0, 255), 2)
+        cv.imshow("RECEIVING VIDEO", frame)
+        key = cv.waitKey(1) & 0xFF
+        if key == ord('q'):
+            server_socket.close()
+            break
+        if cnt == frames_to_count:
+            try:
+                fps = round(frames_to_count / (time.time() - st))
+                st = time.time()
+                cnt = 0
+            except:
+                pass
+        cnt += 1
 
 
 if __name__ == "__main__":
-    # get host ipv4
-    HOST, PORT = socket.gethostbyname(socket.getfqdn()), 80
-
-    # Create the server, binding to localhost on port 80, instantiating Handler of HandlerClass
-    with http.server.ThreadingHTTPServer((HOST, PORT), HandlerClass) as server:
-        # Activate the server; this will keep running until you interrupt the program with Ctrl-C
-        server.serve_forever()
-
-
-
-
-
-
+    #request_handler()
+    handle()
 
 # UI
 

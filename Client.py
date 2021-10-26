@@ -1,34 +1,28 @@
 import tkinter as tk
-import requests
 import socket
-import sys
 import cv2 as cv
 import numpy as np
 import time
 import base64
-import os   #change this later to generalize to users\user\videos\
+import imutils
 from imutils.video import WebcamVideoStream, VideoStream
+import base64
+import sys
 
 HOST, PORT = "192.168.1.160", 80
 
-# can set video dimensions using cv.cap_prop_width etc
-#https://docs.opencv.org/master/dd/d43/tutorial_py_video_display.html
-#create dropdown for each option in gui
+BUFF_SIZE = 65536
+client_socket = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+client_socket.setsockopt(socket.SOL_SOCKET, socket.SO_RCVBUF, BUFF_SIZE)
+host_name = socket.gethostname()
+host_ip = '192.168.1.160'   # socket.gethostbyname(host_name)
+port = 9999
 
+vid = cv.VideoCapture(0)
 
-#test = cv.namedWindow('CameraService', cv.WINDOW_AUTOSIZE)
-#cv.resizeWindow('CameraService', 1000,700)
-streamobject = VideoStream(resolution=(640, 480))
-streamobject.start()
+client_socket.connect((host_ip, port))
 
-# we have access to the frames taking by webcam, now to designate frequency/framerate, how to encode this to
-#video form, or a form that can built on server from bytes.
-
-#What form do we send video over as?
-
-#consider the first frame.
-
-class GUI():
+class GUI:
 
     def __init__(self, master):
 
@@ -41,24 +35,23 @@ class GUI():
         # create a socket (SOCK_STREAM means a TCP socket)
         def sendrequest(serverIP=None):
             fps, st, frames_to_count, cnt = (0, 0, 20, 0)
-            with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as sock:
-                # connect to server
-                sock.connect((HOST, PORT))
-                while True:
+            print('test3')
+            while True:
 
-                    #try:
-                    #send data containing frame, if doesn't exist, except
-                    frame = streamobject.stream.read()
+                WIDTH = 400
+                while vid.isOpened():
+                    print('test1')
+                    _, frame = vid.read()
+                    frame = imutils.resize(frame, width=WIDTH)
                     encoded, buffer = cv.imencode('.jpg', frame, [cv.IMWRITE_JPEG_QUALITY, 80])
-                    message = base64.b64encode(buffer)
-                    sock.sendto(message, (serverIP, 80))
+                    message1 = base64.b64encode(buffer)
+                    client_socket.sendto(message1, (serverIP, port))
                     frame = cv.putText(frame, 'FPS: ' + str(fps), (10, 40), cv.FONT_HERSHEY_SIMPLEX, 0.7, (0, 0, 255),
                                         2)
                     cv.imshow('TRANSMITTING VIDEO', frame)
                     key = cv.waitKey(1) & 0xFF
                     if key == ord('q'):
-                        sock.close()
-                        print('should break?')
+                        client_socket.close()
                         break
                     if cnt == frames_to_count:
                         try:
@@ -69,20 +62,10 @@ class GUI():
                             pass
                     cnt += 1
 
-                    #time.sleep(5)
+        print("Sent:     {}".format('things'))
+        print("Received: {}".format('stuff back'))
 
-                    #except:
-                        #send dummy data to server
-                        #sock.sendall(bytes(string + "\n", "utf-8"))
-
-                        # Receive data from the server and shut down
-                        #received = str(sock.recv(1024), "utf-8")
-                    #break
-
-            print("Sent:     {}".format('things'))
-            print("Received: {}".format('stuff back'))
-
-        self.buttonTest = tk.Button(text='Save Boundary', command=(lambda: sendrequest('192.168.1.160')))
+        self.buttonTest = tk.Button(text='SendRequest', command=(lambda: sendrequest('192.168.1.160')))
         self.canvas.create_window(330, 50, window=self.buttonTest)
 
         # capture video from device
@@ -121,25 +104,3 @@ master = tk.Tk()
 
 gui = GUI(master)
 master.mainloop()
-
-
-
-
-'Extras'
-# can get tk.OptionMenu for dropdown if wanted for camera choice/video quality
-
-#using class WebcamVideoStream from umutils, which uses a daemon thread to read from frames from the video stream,
-#allowing option to read and stop
-
-'''
-BUFF_SIZE = 65536
-clientSocket = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-clientSocket.setsockopt(socket.SOL_SOCKET,socket.SO_RCVBUF,BUFF_SIZE)
-clientname = socket.gethostbyname()
-clientIP = "192.168.1.160" #socket.gethostbyname(clientname)
-#HOST, PORT = "192.168.1.160", 9999
-port = 9999
-socket_address = (clientIP, port)
-clientSocket.bind(socket_address)
-print('Listening at:',socket_address)
-'''
