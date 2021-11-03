@@ -13,6 +13,7 @@ import imutils
 
 ' Plan of action'
 # create Handler that creates a thread for each request     - CURRENT
+#- placing stuff from buffer into their own lists
 # create server ui
 
 ''' Figure Out '''
@@ -31,6 +32,8 @@ server_socket.bind(socket_address)
 print('Listening at:', socket_address)
 
 
+
+
 def request_handler():
     threads = []
     #listens to connection from client, upon receiving, kill connection,
@@ -42,20 +45,72 @@ def request_handler():
 
     ' If multiple connections to single socket'
     # handler can establish connection and then append to a list(buffer) which is defined by sender's address.
+    #if receiving lots of information from socket, may take too long sorting each into a buffer for each thread.
     #Spawn a thread to deal with data in each buffer and show on screen.
+    # each thread will take a image packet, then let another take a packet whilst the first is processing.
 
-    # will create thread and execute handle() function upon receiving request
-    pass
+    ''' Multiple different datasets incoming on one socket - how to split?'''
+    # Each client will have a different ip address - can use ip in header to then append to a list.
+    # Does recvfrom create a buffer for each client address?
+    # and how would I test this?
+
+    ''' Spoofing IP addresses to test threading'''  # CURRENT
+    # Either use a library like scapy or find information in packet headers and edit them?
+    # Editing information in packet headers may require admin privileges
+
+    ''' CURRENT'''
+    # Learn to use winpcap or scapy to edit/send packets
+    # winpcap is much lower level, whereas scapy would have the whole process of packet sniffing abstracted out
+    #rather than having to: https://stackoverflow.com/questions/34842326/mitm-with-winpcap-and-or-sockets-c
+    #/We receive the datagram payload, but no packet headers or anything
+
+    # Finding right modules in scapy to use
+
+    # Currently able to edit source address in packet header, however the problem may remain that
+    #upon receive the source address is corrected, in which cause arp poisoning(?) may be required?
+
+    'later'
+    #IIS on windows 10, app pools
+    #iostream
 
 
-def handle(client_address=None):
+
+    # receive data from socket
+    First = True
+    while True:
+        buffer, client_adress = server_socket.recvfrom(BUFF_SIZE)
+        print('start')
+        print(buffer)
+        print(client_adress)
+        buffer = bytes.decode(buffer, 'utf-8')          # is this needed? Or can i just slice it
+        print(buffer)
+        buffer = base64.b64decode(buffer)
+        print(buffer)
+        print(buffer[:20])
+        buffer = bytes.decode(buffer, 'utf-8')
+        print(buffer[:20])
+        #buffer = buffer.decode('hex')
+        #print(buffer)
+
+        #rawIp = buffer[:20]
+        #rawIp = str(rawIp)
+        #print(rawIp)
+
+        print('test')
+
+        # initialize first time connection settings
+        if First:
+            #create list and append to it
+            #spawn thread and work on list
+            pass
+
+        First = False
+
+
+def handle(packet):
 
     fps, st, frames_to_count, cnt = (0, 0, 20, 0)
     while True:
-        print('ready to receive')
-        packet, _ = server_socket.recvfrom(BUFF_SIZE)
-        print('hi')
-        print(packet)
         data = base64.b64decode(packet, ' /')
         npdata = np.fromstring(data, dtype=np.uint8)
         frame = cv.imdecode(npdata, 1)
@@ -76,8 +131,8 @@ def handle(client_address=None):
 
 
 if __name__ == "__main__":
-    #request_handler()
-    handle()
+    request_handler()
+    #handle()
 
 # UI
 
