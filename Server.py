@@ -10,28 +10,20 @@ from io import IOBase as IO
 import threading
 import socketserver
 import imutils
+import socketSendAndReceive
+# import scapySendAndReceive
 
 ' Plan of action'
 # create Handler that creates a thread for each request     - CURRENT
 #- placing stuff from buffer into their own lists
 # create server ui
 
-''' Figure Out '''
-#how to break the program
+'''Current'''
+# abtract away socket, then create scapy abstraction for testing use
+# see how scapy receives udp datagrams to emulate socket.recvfrom
 
-BUFF_SIZE = 65536
-server_socket = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-server_socket.setsockopt(socket.SOL_SOCKET, socket.SO_RCVBUF, BUFF_SIZE)
-host_name = socket.gethostname()
-host_ip = socket.gethostbyname(host_name)
-print(host_ip)
-port = 9999
-
-socket_address = (host_ip, port)
-server_socket.bind(socket_address)
-print('Listening at:', socket_address)
-
-
+'currentcurrent'
+# currently on scapy, send/recv + integrate video into send.
 
 
 def request_handler():
@@ -54,60 +46,21 @@ def request_handler():
     # Does recvfrom create a buffer for each client address?
     # and how would I test this?
 
-    ''' Spoofing IP addresses to test threading'''  # CURRENT
-    # Either use a library like scapy or find information in packet headers and edit them?
-    # Editing information in packet headers may require admin privileges
+    ' Solution? '
+    # Buffer will be a global variable
+    # Multiple threads can access it using a lock system of some sort, thus each thread will be doing the
+    #'sorting' per say, iterating through buffer to grab frames valid for it.
 
-    ''' CURRENT'''
-    # Learn to use winpcap or scapy to edit/send packets
-    # winpcap is much lower level, whereas scapy would have the whole process of packet sniffing abstracted out
-    #rather than having to: https://stackoverflow.com/questions/34842326/mitm-with-winpcap-and-or-sockets-c
-    #/We receive the datagram payload, but no packet headers or anything
-
-    # Finding right modules in scapy to use
-
-    # Currently able to edit source address in packet header, however the problem may remain that
-    #upon receive the source address is corrected, in which cause arp poisoning(?) may be required?
+    ''' Abstract away different send/receive methods so I don't have to write 2x server/client models'''
 
     'later'
     #IIS on windows 10, app pools
     #iostream
 
+    socketSendAndReceive.socketReceive()
 
 
-    # receive data from socket
-    First = True
-    while True:
-        buffer, client_adress = server_socket.recvfrom(BUFF_SIZE)
-        print('start')
-        print(buffer)
-        print(client_adress)
-        buffer = bytes.decode(buffer, 'utf-8')          # is this needed? Or can i just slice it
-        print(buffer)
-        buffer = base64.b64decode(buffer)
-        print(buffer)
-        print(buffer[:20])
-        buffer = bytes.decode(buffer, 'utf-8')
-        print(buffer[:20])
-        #buffer = buffer.decode('hex')
-        #print(buffer)
-
-        #rawIp = buffer[:20]
-        #rawIp = str(rawIp)
-        #print(rawIp)
-
-        print('test')
-
-        # initialize first time connection settings
-        if First:
-            #create list and append to it
-            #spawn thread and work on list
-            pass
-
-        First = False
-
-
-def handle(packet):
+def handle(packet, threadsocket):
 
     fps, st, frames_to_count, cnt = (0, 0, 20, 0)
     while True:
@@ -118,7 +71,7 @@ def handle(packet):
         cv.imshow("RECEIVING VIDEO", frame)
         key = cv.waitKey(1) & 0xFF
         if key == ord('q'):
-            server_socket.close()
+            threadsocket.close()
             break
         if cnt == frames_to_count:
             try:

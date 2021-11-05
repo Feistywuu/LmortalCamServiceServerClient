@@ -42,3 +42,5 @@
 #- Create sockets on start-up that are in a listening state
 
 #- create a unique socket for each client connection in a child process/thread, when they connect.
+
+# Then how do we get to OBS? Does it
