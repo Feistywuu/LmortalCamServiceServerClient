@@ -17,8 +17,8 @@ def socketSend(serverIP=None):
     client_socket = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
     client_socket.setsockopt(socket.SOL_SOCKET, socket.SO_RCVBUF, BUFF_SIZE)
     host_name = socket.gethostname()
-    host_ip = '192.168.1.160'  # socket.gethostbyname(host_name)
-    port = 10001
+    host_ip = '192.168.1.192'  # socket.gethostbyname(host_name)
+    port = 10003
 
     vid = cv.VideoCapture(0)
 
@@ -67,7 +67,7 @@ def socketReceive():
     host_name = socket.gethostname()
     host_ip = socket.gethostbyname(host_name)
     print(host_ip)
-    port = 10001
+    port = 10003
 
     socket_address = (host_ip, port)
     server_socket.bind(socket_address)
