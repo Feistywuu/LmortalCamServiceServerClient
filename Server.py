@@ -8,23 +8,142 @@ import time
 import io
 from io import IOBase as IO
 import threading
+import logging
 import socketserver
 import imutils
 import socketSendAndReceive
 import scapySendAndReceive
+
+' Musings '
+# source_ip is a string, and when passed as an argument, it takes every character as an argument.
+#Can store inside a list to keep len(arg=1), but is there a more standard fix?
+#Upon parsing, seems to remove list from a variable referencing: list[len=1, containing a str]
+# - Why? Seems to be specific to threading (args() parse, maybe KWARGS**?
 
 ' Plan of action'
 # create Handler that creates a thread for each request     - CURRENT
 #- placing stuff from buffer into their own lists
 # create server ui
 
-'''Current'''
-# abtract away socket, then create scapy abstraction for testing use
-# see how scapy receives udp datagrams to emulate socket.recvfrom
-
-'currentcurrent'
+'Current'
 # currently on scapy, send/recv + integrate video into send.
 # then implement multiple sockets, sending with spoofed ip's - \\\ go back and init. sockets \\\
+
+# YATTA! Can build a packet with specified source ip in scapy, and it is received with same source ip!!!
+#Build multiple packets with diffferent IP'S
+#Play around with threading and see how to sort the packets
+
+# might need to implement a pause function to impose fps
+# might need to figure out how to update framecache while 'While' loop is running?
+# might have to consider when thread deletes from ClientDict, then same thread runs before it is updated by the main
+
+# KeyError 255: which is a lookup error in the dictionary for python, caused when While added? Some thread-sharing
+#issues?
+# might want to consider deleting the value at key value, not key itself to preserve thread.
+
+#inserts integer 255 after first attempt at print(CLientdict[key[0]])
+#why? max value of an 8-byte value
+
+# after 'del' on first run-through, creates clientList key:value again, but key is now [255]?
+
+# progression of key[0]
+# '192.167.1.191 > [255] > 255 > error
+#!!! related to being in the while loop, not updating?
+
+# Thread(1):
+    #while ProcessFrames():
+        #CacheandClearDict()
+
+# Error [255] occurs when CacheAndClearDict runs, deletes, then runs again before ClientDict is refilled.
+# so the question is considering thread order and such
+
+# define application packet header, send via socket,
+# main loop, read packet header, decisions based on that.
+
+# create packet class, attribute for cookies and stuff, variables to create to raw
+
+# packet header( value/length of payload,short packet type, cookie )
+
+#flag i must have 20 btyes or so, header size, so waiting for full headersize, while loop listening
+# flag- freeze on the receive line for packet header, then freeze until packet data all arrived defined by header
+
+'Plan'
+# Define Packet class
+    # attributes will be the contents of the packet header:
+        # header( value/length of payload, packet type, cookie)
+            # value = buf_size = 65536,thus unsigned short is fine
+                # **be aware this isn't 1 memory too big**
+            # packet type = bool (udp, or not udp)
+            # cookie = unsigned int, we want a storage of 2^32, since at 30 fps, we will reach 2^16 in 30 minutes.
+        # then we will pack this into a string/byte format, using .pack()
+    # payload should be callable by packet.raw()
+    # define a send function, which can send the header and/or payload
+
+#Define receive end
+    # while loop, using recvfrom(), once receiving the packet header, will
+    # then unpack on server side using specified format
+
+#What were the nuances behind the cookie?
+# since UDP is connectionless, we want a a way to record interaction with a client, thus rather than using IP,
+#we can use this cookie for client identification
+# So do we just use the value of the integer and compare to last values?
+#what if packet are received out-of-order?
+#what if multiple client connect at the time, thus having same cookie value?
+# Solution - cookie made up of id integer and tracker value: cookie = (id, tracker)
+#id value can be made as a random 2^32 value, with error catching clause if by chance 2 clients have the same value
+#by comparing the tracker, number too, which happening simultaneously would only happen if client is used by *large*
+#amount of people, with concentrated peak times.
+
+
+
+def request_handler():
+    ''' Solution?
+    # Buffer will be a global variable
+    # Multiple threads can access it using a lock system of some sort, thus each thread will be doing the
+    # 'sorting' per say, iterating through buffer to grab frames valid for it?
+    '''
+
+    # receive individual packet, with ip data
+
+    # append each packet to a list defined by ip
+    #create thread to deal with list defined by ip:
+    #If list has to be created then spawn thread? Else, just append to list
+
+    # maybe turn this into a bool state, then thread can be created in that file
+    socketSendAndReceive.socketReceive()
+
+
+# need to change file name?
+if __name__ == "__main__":
+    format1 = "%(asctime)s: %(message)s"
+    logging.basicConfig(format=format1, level=logging.INFO,
+                        datefmt="%H:%M:%S")
+
+    # spawn thread for request_handler
+    x = threading.Thread(target=request_handler, args=())
+    x.start()
+    # have button in the gui to stop listening - join() request_handler thread.
+    #x.join()
+
+# UI
+
+#window = tk.Tk()
+
+# add widgets here
+
+#window.title('Hello Python')
+#window.geometry("300x200+10+20")
+#window.mainloop()
+
+
+'later'
+    #IIS on windows 10, app pools
+    #iostream
+
+
+
+
+''' //// TIMELINE /////
 
 # need to find separate send/receive functions in scapy
 #/send and sniff?
@@ -97,76 +216,10 @@ import scapySendAndReceive
 #problems with scapy.
 #SO Wireshark now sees the packet being transferred, but scapy.sniff() doesn't see it - explore
 
+#Server still doesn't receive - 'icmp protocol message - port unreachable'
+# Socket not ready to receive on server end? Or invalid port number?
 
-def request_handler():
-    threads = []
-    #listens to connection from client, upon receiving, kill connection,
-    # create thread and listen again for connection, upon confirming the same, handle
-    # - will listening in first half pick-up a socket connecting in another thread?
-    #OR
-    # listen for request, if received, stop listening.
-    # create thread and send task of listening to that thread
+#try sending with scapy and receiving with socket
+#YATTA! Can build a packet with specified source ip in scapy, and it is received with same source ip!!!
 
-    ' If multiple connections to single socket'
-    # handler can establish connection and then append to a list(buffer) which is defined by sender's address.
-    #if receiving lots of information from socket, may take too long sorting each into a buffer for each thread.
-    #Spawn a thread to deal with data in each buffer and show on screen.
-    # each thread will take a image packet, then let another take a packet whilst the first is processing.
-
-    ''' Multiple different datasets incoming on one socket - how to split?'''
-    # Each client will have a different ip address - can use ip in header to then append to a list.
-    # Does recvfrom create a buffer for each client address?
-    # and how would I test this?
-
-    ' Solution? '
-    # Buffer will be a global variable
-    # Multiple threads can access it using a lock system of some sort, thus each thread will be doing the
-    #'sorting' per say, iterating through buffer to grab frames valid for it.
-
-    ''' Abstract away different send/receive methods so I don't have to write 2x server/client models'''
-
-    'later'
-    #IIS on windows 10, app pools
-    #iostream
-
-    #socketSendAndReceive.socketReceive()
-    scapySendAndReceive.scapyRecv()
-
-
-def handle(packet, threadsocket):
-
-    fps, st, frames_to_count, cnt = (0, 0, 20, 0)
-    while True:
-        data = base64.b64decode(packet, ' /')
-        npdata = np.fromstring(data, dtype=np.uint8)
-        frame = cv.imdecode(npdata, 1)
-        frame = cv.putText(frame, 'FPS: ' + str(fps), (10, 40), cv.FONT_HERSHEY_SIMPLEX, 0.7, (0, 0, 255), 2)
-        cv.imshow("RECEIVING VIDEO", frame)
-        key = cv.waitKey(1) & 0xFF
-        if key == ord('q'):
-            threadsocket.close()
-            break
-        if cnt == frames_to_count:
-            try:
-                fps = round(frames_to_count / (time.time() - st))
-                st = time.time()
-                cnt = 0
-            except:
-                pass
-        cnt += 1
-
-
-if __name__ == "__main__":
-    request_handler()
-    #handle()
-
-# UI
-
-#window = tk.Tk()
-
-# add widgets here
-
-#window.title('Hello Python')
-#window.geometry("300x200+10+20")
-#window.mainloop()
-
+'''
