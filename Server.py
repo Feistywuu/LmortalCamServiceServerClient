@@ -94,6 +94,8 @@ import scapySendAndReceive
 #by comparing the tracker, number too, which happening simultaneously would only happen if client is used by *large*
 #amount of people, with concentrated peak times.
 
+#generate identity code when client starts program, which is then attached to each packet header cookie
+
 
 
 def request_handler():

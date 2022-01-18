@@ -5,7 +5,9 @@ import cv2 as cv
 import imutils
 import base64
 import time
+import random
 import socket
+import string
 
 # Define Packet class
     # attributes will be the contents of the packet header:
@@ -24,38 +26,157 @@ import socket
     # payload should be callable by packet.raw()
     # define a send function, which can send the header and/or payload
 
+''' to watch for '''
+# beware the scope of n
+
+
+def id_generator():
+    """
+    create client id at runtime that can be contained in packet header
+    id of form: 'xxxxxxxx', where x can be lower/upper character or number 0-9
+    thus of size, char = c: cccccccc
+    :return: str
+    """
+    # string 8 characters long
+    idString = ''
+    for x in range(0, 7):
+        deciderVar = random.randint(0, 1)
+        if deciderVar == 0:
+            letters = random.choice(string.ascii_letters)
+            idString.join(letters)
+        else:
+            num = random.choice(string.digits)
+            idString.join(num)
+
+    return idString
+
+
+IdentityCode = id_generator()
+PacketNumber = 0                            # tracker variable, which goes up every time a packet is made
+
+# BUFF_SIZE = 65516                 actual BUFF_SIZE = 65536, but 20 bytes to make space for socket header
+
 
 class Packet:
-    '''
+    """
     length = int = unsigned short
     udpTrue = bool = bool
     cookie = (int,int) = unsigned int
-    '''
+    """
 
-    def __init__(self, data):
+    def __init__(self, data, buffersize):
+        global PacketNumber
+
+        # internal values
+        self.payload = str
+        self.payloadPartitions = {}
+        self.id = IdentityCode
+
+        # header values
         self.length = int
-        self.udpTrue = bool
-        self.cookie = (int, int)
+        self.udpTrue = True
+        self.cookie = (self.id, PacketNumber)
 
-        # checking if data fits within packet size, if not split over separate packets
-        # so if payload is already in byteform
-        BUFF_SIZE = 65536
-        if data >= BUFF_SIZE:
-            # get data, slice 65536 bytes off the front
-            # create packet with a payload with remaining byte-string. Length as defined, udpTrue = true, cookie - same.
-            # repeat step if needed
-            pass
+
+        # checking if data fits within packet size, if not, split over separate packets
+        # provided payload is already in byteform
+        n = '0'
+        header_length = 11                      # short + bool + 8 chars = 2 + 1 + 8
+        if len(data) >= BUFF_SIZE:
+
+            # get data, slice byte-string into 65316 slices and make room for the header
+            payload = data[header_length:BUFF_SIZE-header_length]
+            remainder = data[BUFF_SIZE-header_length:]
+
+            # add first partition to dict. of partitions
+            self.payloadPartitions[n] = payload
+            n = int(n)
+            n += 1
+            n = str(n)
+
+            # split and add remaining payload to dictionary, iterating until there is one partitions worth left
+            while len(remainder) >= BUFF_SIZE:
+                self.payloadPartitions[n] = remainder[:BUFF_SIZE-header_length]
+                remainder = remainder[BUFF_SIZE-header_length:]
+                n = int(n)
+                n += 1
+                n = str(n)
+
+            # last partition
+            if len(remainder) != 0:
+                self.payloadPartitions[n] = remainder[:]
+
+            # set header values - length, add to packetNumber
+            packetLength = 0
+            for value in self.payloadPartitions.values():
+                print(len(value))
+                packetLength += len(value)
+            self.length = packetLength
+            PacketNumber += 1
         else:
             self.payload = data
 
+    def partition(self, buffersize):
+        """
+        Takes the data payload of the packet and split into partitions specified by the buffer size
+        :return:
+        """
+
+        if len(data) >= buffersize:
+
+            # get data, slice byte-string into 65316 slices and make room for the header
+            payload = data[header_length:buffersize-header_length]
+            remainder = data[buffersize-header_length:]
+
+            # add first partition to dict. of partitions
+            self.payloadPartitions[n] = payload
+            n = int(n)
+            n += 1
+            n = str(n)
+
+            # split and add remaining payload to dictionary, iterating until there is one partitions worth left
+            while len(remainder) >= buffersize:
+                self.payloadPartitions[n] = remainder[:buffersize-header_length]
+                remainder = remainder[buffersize-header_length:]
+                n = int(n)
+                n += 1
+                n = str(n)
+
+            # last partition
+            if len(remainder) != 0:
+                self.payloadPartitions[n] = remainder[:]
+
+            # set header values - length, add to packetNumber
+            packetLength = 0
+            for value in self.payloadPartitions.values():
+                print(len(value))
+                packetLength += len(value)
+            self.length = packetLength
+            PacketNumber += 1
+        else:
+            self.payload = data
+
+
     def header(self):
-        ''' Here the packet '''
+        """
+        Takes the packet header info, stored as object attributes, packs them in byteform.
+        """
         pass
 
     def raw(self):
+        """
+        Take the payload from object attribute and
+        :return:
+        """
         pass
 
     def send(self):
+        """
+        Take a header or data payload and split into partitions if needed for buffer size
+        Then send them via socket, if payload is split over partitions, send them
+        iteratively in order.
+        :return: null
+        """
         pass
 
 
