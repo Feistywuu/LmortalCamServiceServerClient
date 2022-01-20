@@ -8,6 +8,62 @@ import time
 import threading
 import numpy as np
 from copy import deepcopy
+import Packet as packet
+
+
+def socketSend(serverIP=None):
+    """"
+    Send packets via .socket, initialize needed variables
+    """
+
+    # initialize variables
+    HOST, PORT = "192.168.1.160", 80
+
+    BUFF_SIZE = 65516
+    client_socket = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+    client_socket.setsockopt(socket.SOL_SOCKET, socket.SO_RCVBUF, BUFF_SIZE)
+    host_name = socket.gethostname()
+    host_ip = '192.168.1.192'  # socket.gethostbyname(host_name)
+    port = 10003
+
+    vid = cv.VideoCapture(0)
+
+    client_socket.connect((host_ip, port))
+
+    fps, st, frames_to_count, cnt = (0, 0, 20, 0)
+    print('test3')
+    while True:
+
+        WIDTH = 400
+        while vid.isOpened():
+            # get video frames, process
+            _, frame = vid.read()
+            frame = imutils.resize(frame, width=WIDTH)
+            encoded, buffer = cv.imencode('.jpg', frame, [cv.IMWRITE_JPEG_QUALITY, 80])
+            message1 = base64.b64encode(buffer)
+
+            # create packet
+            myPacket = packet.Packet(message1)
+
+            # send packets
+            myPacket.send(BUFF_SIZE, client_socket, serverIP, port)
+
+            frame = cv.putText(frame, 'FPS: ' + str(fps), (10, 40), cv.FONT_HERSHEY_SIMPLEX, 0.7, (0, 0, 255),
+                               2)
+            cv.imshow('TRANSMITTING VIDEO', frame)
+            key = cv.waitKey(1) & 0xFF
+            if key == ord('q'):
+                client_socket.close()
+                break
+            if cnt == frames_to_count:
+                try:
+                    fps = round(frames_to_count / (time.time() - st))
+                    st = time.time()
+                    cnt = 0
+                except:
+                    pass
+            cnt += 1
+
 
 # Need a dictionary of client's based on their IP's to check packet against.
 # of form { ip1:[frame1,....,frameN], ...., ipN:[frame1, ..., frameN]}  (ip=string)
@@ -15,6 +71,17 @@ ClientDict = {}
 Threads = []
 print('id of clientlist: ' + str(id(ClientDict)))
 
+
+# order determined when they are added to threads list
+#   need to add main thread to this list somehow
+#   order of execute (for loop), will be defined in server, thus need to import Threads[].
+#   request_handler won't be part of Threads[]
+#   start
+
+# will need to create another thread for the gui in server
+# processframes needs to loop until there are no frames left to process, but if they all join before starting next jobs
+#some will have stopped will others are finishing, thus they have to be independent.
+# OR they don't join and wait for eachother.
 
 def sortPackets(packet):
     '''
@@ -39,7 +106,7 @@ def sortPackets(packet):
         print('created clientlist key: ' + str(id(ClientDict[source_ip])))
         print(ClientDict[source_ip])
 
-        # spawn thread, add to list
+        # add to threads list
         print([source_ip])
         x = threading.Thread(target=ProcessFrames, args=[source_ip])
         Threads.append(x)
@@ -134,10 +201,13 @@ def socketReceive():
     # receive data from socket
     First = True
     while True:
-        packet = server_socket.recvfrom(BUFF_SIZE)      # in tuple form (buffer, (source_ip, port))
+        mypacket = server_socket.recvfrom(BUFF_SIZE)      # in tuple form (buffer, (source_ip, port))
         print('starting main receive loop again')
         #print(packet)
-        sortPackets(packet)
+        sortPackets(mypacket)
+
+
+
 
 
 # Global Variable issue
@@ -155,55 +225,3 @@ doing the same task, splitting bytewise ends badly.
 Thus locks are needed.
 '''
 
-
-
-
-'''
-def socketSend(serverIP=None):
-    ' Send packets via .socket, initialize needed variables '
-
-    # initialize variables
-    HOST, PORT = "192.168.1.160", 80
-
-    BUFF_SIZE = 65536
-    client_socket = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-    client_socket.setsockopt(socket.SOL_SOCKET, socket.SO_RCVBUF, BUFF_SIZE)
-    host_name = socket.gethostname()
-    host_ip = '192.168.1.192'  # socket.gethostbyname(host_name)
-    port = 10003
-
-    vid = cv.VideoCapture(0)
-
-    client_socket.connect((host_ip, port))
-
-    fps, st, frames_to_count, cnt = (0, 0, 20, 0)
-    print('test3')
-    while True:
-
-        WIDTH = 400
-        while vid.isOpened():
-            print('test1')
-            _, frame = vid.read()
-            frame = imutils.resize(frame, width=WIDTH)
-            print(frame)
-            encoded, buffer = cv.imencode('.jpg', frame, [cv.IMWRITE_JPEG_QUALITY, 80])
-            print(buffer)
-            message1 = base64.b64encode(buffer)
-            print(message1)
-            client_socket.sendto(message1, (serverIP, port))
-            frame = cv.putText(frame, 'FPS: ' + str(fps), (10, 40), cv.FONT_HERSHEY_SIMPLEX, 0.7, (0, 0, 255),
-                               2)
-            cv.imshow('TRANSMITTING VIDEO', frame)
-            key = cv.waitKey(1) & 0xFF
-            if key == ord('q'):
-                client_socket.close()
-                break
-            if cnt == frames_to_count:
-                try:
-                    fps = round(frames_to_count / (time.time() - st))
-                    st = time.time()
-                    cnt = 0
-                except:
-                    pass
-            cnt += 1
-'''

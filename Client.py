@@ -1,15 +1,6 @@
 import tkinter as tk
-import socket
 import cv2 as cv
-import numpy as np
-import time
-import base64
-import imutils
-from imutils.video import WebcamVideoStream, VideoStream
-import base64
-import sys
 import socketSendAndReceive
-import scapySendAndReceive
 
 
 def TestCamera():
@@ -52,10 +43,8 @@ class GUI:
         self.master.title("LmortalCamsService")
 
         # send video data via socket
-        self.buttonTest = tk.Button(text='SendRequest', command=(lambda: scapySendAndReceive.scapySend('192.168.1.160', 10003)))
-        #self.buttonTest = tk.Button(text='SendRequest', command=(lambda: socketSendAndReceive.socketSend('192.168.1.160')))
+        self.buttonTest = tk.Button(text='SendRequest', command=(lambda: socketSendAndReceive.socketSend('192.168.1.160')))
         self.canvas.create_window(330, 50, window=self.buttonTest)
-        # command=(lambda: socketSendAndReceive.socketSend('192.168.1.160')))
 
         # capture video from device
         self.buttonTest = tk.Button(text='Camera', command=TestCamera)

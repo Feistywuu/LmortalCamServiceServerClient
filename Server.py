@@ -1,24 +1,10 @@
-import tkinter as tk
-import socket
-import http.server
-import base64
-import numpy as np
-import cv2 as cv
-import time
-import io
-from io import IOBase as IO
+from queue import *
 import threading
 import logging
-import socketserver
-import imutils
 import socketSendAndReceive
-import scapySendAndReceive
 
 ' Musings '
-# source_ip is a string, and when passed as an argument, it takes every character as an argument.
-#Can store inside a list to keep len(arg=1), but is there a more standard fix?
-#Upon parsing, seems to remove list from a variable referencing: list[len=1, containing a str]
-# - Why? Seems to be specific to threading (args() parse, maybe KWARGS**?
+# Use cookie as a way of identification
 
 ' Plan of action'
 # create Handler that creates a thread for each request     - CURRENT
@@ -26,11 +12,7 @@ import scapySendAndReceive
 # create server ui
 
 'Current'
-# currently on scapy, send/recv + integrate video into send.
-# then implement multiple sockets, sending with spoofed ip's - \\\ go back and init. sockets \\\
 
-# YATTA! Can build a packet with specified source ip in scapy, and it is received with same source ip!!!
-#Build multiple packets with diffferent IP'S
 #Play around with threading and see how to sort the packets
 
 # might need to implement a pause function to impose fps
@@ -57,45 +39,9 @@ import scapySendAndReceive
 # Error [255] occurs when CacheAndClearDict runs, deletes, then runs again before ClientDict is refilled.
 # so the question is considering thread order and such
 
-# define application packet header, send via socket,
-# main loop, read packet header, decisions based on that.
-
-# create packet class, attribute for cookies and stuff, variables to create to raw
-
-# packet header( value/length of payload,short packet type, cookie )
-
-#flag i must have 20 btyes or so, header size, so waiting for full headersize, while loop listening
-# flag- freeze on the receive line for packet header, then freeze until packet data all arrived defined by header
-
-'Plan'
-# Define Packet class
-    # attributes will be the contents of the packet header:
-        # header( value/length of payload, packet type, cookie)
-            # value = buf_size = 65536,thus unsigned short is fine
-                # **be aware this isn't 1 memory too big**
-            # packet type = bool (udp, or not udp)
-            # cookie = unsigned int, we want a storage of 2^32, since at 30 fps, we will reach 2^16 in 30 minutes.
-        # then we will pack this into a string/byte format, using .pack()
-    # payload should be callable by packet.raw()
-    # define a send function, which can send the header and/or payload
-
-#Define receive end
-    # while loop, using recvfrom(), once receiving the packet header, will
-    # then unpack on server side using specified format
-
-#What were the nuances behind the cookie?
-# since UDP is connectionless, we want a a way to record interaction with a client, thus rather than using IP,
-#we can use this cookie for client identification
-# So do we just use the value of the integer and compare to last values?
-#what if packet are received out-of-order?
-#what if multiple client connect at the time, thus having same cookie value?
-# Solution - cookie made up of id integer and tracker value: cookie = (id, tracker)
-#id value can be made as a random 2^32 value, with error catching clause if by chance 2 clients have the same value
-#by comparing the tracker, number too, which happening simultaneously would only happen if client is used by *large*
-#amount of people, with concentrated peak times.
-
-#generate identity code when client starts program, which is then attached to each packet header cookie
-
+' Current'
+# work on threading and handling incoming packets
+# how beneficial is threading after implementing queues?
 
 
 def request_handler():
@@ -115,8 +61,18 @@ def request_handler():
     socketSendAndReceive.socketReceive()
 
 
+def ExecuteProcessThread():
+    """
+    Takes an job from the queue and starts a thread to execute it
+    :return:
+    """
+
+
 # need to change file name?
 if __name__ == "__main__":
+
+    # set variables
+    queue = Queue()
     format1 = "%(asctime)s: %(message)s"
     logging.basicConfig(format=format1, level=logging.INFO,
                         datefmt="%H:%M:%S")
@@ -124,6 +80,30 @@ if __name__ == "__main__":
     # spawn thread for request_handler
     x = threading.Thread(target=request_handler, args=())
     x.start()
+
+    # spawn thread for tkinter gui
+    #later
+
+    # order does not matter in Q, as long as all are completed, then socketreceive is updated
+
+    # main frame processing loop, iterates over thread list
+    while True:
+
+        for thread in socketSendAndReceive.Threads:
+            # put threads into queue
+            print("inserting job into the queue: %s" % thread)
+            queue.put(thread)
+
+        for i in range(len(socketSendAndReceive.Threads)):
+
+
+
+            # execute
+
+
+        pass
+
+
     # have button in the gui to stop listening - join() request_handler thread.
     #x.join()
 
@@ -225,3 +205,16 @@ if __name__ == "__main__":
 #YATTA! Can build a packet with specified source ip in scapy, and it is received with same source ip!!!
 
 '''
+
+#What were the nuances behind the cookie?
+# since UDP is connectionless, we want a a way to record interaction with a client, thus rather than using IP,
+#we can use this cookie for client identification
+# So do we just use the value of the integer and compare to last values?
+#what if packet are received out-of-order?
+#what if multiple client connect at the time, thus having same cookie value?
+# Solution - cookie made up of id integer and tracker value: cookie = (id, tracker)
+#id value can be made as a random 2^32 value, with error catching clause if by chance 2 clients have the same value
+#by comparing the tracker, number too, which happening simultaneously would only happen if client is used by *large*
+#amount of people, with concentrated peak times.
+
+#generate identity code when client starts program, which is then attached to each packet header cookie
