@@ -3,6 +3,7 @@ import random
 import string
 import struct
 import socket
+import base64
 
 ''' to watch for '''
 # beware the scope of n
@@ -18,15 +19,17 @@ def id_generator():
     """
     # string 8 characters long
     idString = ''
-    for x in range(0, 7):
+
+    for x in range(0, 8):
         deciderVar = random.randint(0, 1)
         if deciderVar == 0:
-            letters = random.choice(string.ascii_letters)
-            idString.join(letters)
+            letter = random.choice(string.ascii_letters)
+            idString = idString + letter
         else:
-            num = random.choice(string.digits)
-            idString.join(num)
+            number = random.choice(string.digits)
+            idString = idString + number
 
+    idString = bytes(idString, 'utf-8')
     return idString
 
 
@@ -51,7 +54,7 @@ class Packet:
 
         # header values
         self.length = len(data)
-        self.udpTrue = True
+        self.udpTrue = 1
         self.idcode = IdentityCode
         self.packetnumber = PacketNumber
 
@@ -66,7 +69,7 @@ class Packet:
 
         # provided payload is already in byteform
         n = '0'
-        header_length = 15                      # short + bool + 8 chars + int = 2 + 1 + 8 + 4
+        header_length = 15                      # short + bool + string(len=8) + int = 2 + 1 + 8 + 4
 
         if len(self.raw) >= buffersize:
 
@@ -106,14 +109,17 @@ class Packet:
         """
         Take a header or data payload and split into partitions if needed for buffer size,
         if passing header, as argument, pack before sending;
-        then send them via socket; if payload is split over partitions, send them
+        then send them via socket;
+        Otherwise, the payload is split over partitions, send them
         iteratively in order.
         Takes buffer_size as an argument.
         :return: str or dict
         """
         # determine whether header or payload
         if header:
-            byteform = struct.pack('!h?BBBBBBBBI', self.length, self.udpTrue, self.idcode, self.packetnumber)
+
+            byteform = struct.pack('!h?8sI', self.length, self.udpTrue, self.idcode, self.packetnumber)
+            test = struct.unpack('!h?8sI', byteform)
 
         # split raw data if too big for buffer
         else:

@@ -2,6 +2,7 @@ from queue import *
 import threading
 import logging
 import socketSendAndReceive
+import Packet as packet
 
 ' Musings '
 # Use cookie as a way of identification
@@ -40,8 +41,13 @@ import socketSendAndReceive
 # so the question is considering thread order and such
 
 ' Current'
+# use header info in sort packets
+
 # work on threading and handling incoming packets
-# how beneficial is threading after implementing queues?
+#   as long as frames are deposited/processed FIFO, we only need locks when appending to dictionary.
+#   locking might not be required since information only flows one way - tree
+
+#       will need to check payloadAssembler with a bigger packet at some point
 
 
 def request_handler():
@@ -61,11 +67,6 @@ def request_handler():
     socketSendAndReceive.socketReceive()
 
 
-def ExecuteProcessThread():
-    """
-    Takes an job from the queue and starts a thread to execute it
-    :return:
-    """
 
 
 # need to change file name?
@@ -95,7 +96,8 @@ if __name__ == "__main__":
             queue.put(thread)
 
         for i in range(len(socketSendAndReceive.Threads)):
-
+            # cache and clear
+            pass
 
 
             # execute
