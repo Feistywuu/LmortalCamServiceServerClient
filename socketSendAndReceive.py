@@ -13,10 +13,9 @@ import Packet as packet
 
 
 # Dictionary holding {clientID;video frames} key;value pairs.
-# Create a copy global variable for threading to interact with, thus removing need for lock when accessing the variable,
-#thus potentially being quicker in terms for storage of an extra variable.
+# ClientDict must be FIFO, as of 3.7 python dict is now ordered.
+# CLientDict = { clientID;[frame1, ..., frameN] , ...}
 ClientDict = {}
-ThreadingClientDict = []
 Threads = []
 
 
@@ -32,106 +31,89 @@ Threads = []
 # OR they don't join and wait for eachother.
 
 
+def fpsMaintainer(targetfps, previoustime):
+    """
+    Function to sleep thread according to desired fps.
+    Starts recording time spent from first function call, when returning to function call again, sleep() thread
+    if amount of time required to set a desired fps is needed.
+    :return: time at specific point in function = int
+    """
+    print('FPS Check')
+
+    # start recording time, with time()
+    currentTime = time.time()
+
+    # check value of 1/fps and compare value to time passed since last function call
+    elapsedTime = currentTime - previoustime
+    desiredSleep = 1 / targetfps
+    print(elapsedTime)
+
+    try:
+        time.sleep(desiredSleep - elapsedTime)
+        print(time.sleep(desiredSleep - elapsedTime))
+    except ValueError:
+        print('No sleep')
+
+    return currentTime
+
+
 def sortPacket(mypacket, packetheader):
     '''
-    Appends packet to dictionary as a {client;id}.
+    All appends to dictionary will be to the end of the value list, ensures processing is FIFO.
     Takes a packet and packet header as an argument.
+    Processes the payload into easily displayable frame; appends packet to dictionary as a {client;id}.
     Checks packet header for client id, if new client, create thread to process frames, append to dictionary;
     if current client, just add to dictionary.
     '''
     print('Sorting Packets')
 
+    payload = mypacket
+    npdata = np.fromstring(payload, dtype=np.uint8)
+    frame = cv.imdecode(npdata, 1)
+
     # converting from bytes to string
     clientID = packetheader[2].decode('utf-8')
 
-    payload = mypacket
-
     # check for id in dict
-    # if id in dict, add payload to value list
     if clientID in ClientDict:
-        ClientDict[clientID].append(payload)
+        ClientDict[clientID].append(frame)
         print('add to clientListKey: ' + clientID)
 
-    # if not in dict, add ip:payload as key:[value]
     if clientID not in ClientDict:
-        ClientDict[clientID] = [payload]
+        ClientDict[clientID] = [frame]
         print('created clientlist key: ' + str(id(ClientDict[clientID])))
-        print(ClientDict[clientID])
 
         # add to threads list
-        print([clientID])
         x = threading.Thread(target=ProcessFrames, args=[clientID])
         Threads.append(x)
         x.start()
 
 
-def CacheandClearDict(key):
+def ProcessFrames(clientid):
     '''
-    Firstly, locks thread to the interpreter, to avoid any race conditions.
-    When passed a key from a dictionary, make a copy() of it, then delete value in original dict, then unlock.
-    :param key:
-    :return: [frames]
+    Will pop the frame from the bottom of the stack.
+    When given a the key from a dictionary, retrieves frames thread-safely and pops them from the dict,
+    then performs decoding, timing to show frames as a video
     '''
-
-    # lock thread to interpreter
-    Lock = threading.Lock()
-    Lock.acquire()
-
-    print('CachingfromDict: Locked')  # maybe comments are overkill?
-    print(key)
-    print(key[0])
-    print(type(key[0]))
-    print(str(key[0]))
-    print(ClientDict)
-    print(ClientDict[key[0]])
-
-    # copy data and cache
-    frameCache = deepcopy(ClientDict[key[0]])
-    print(frameCache)
-
-    # delete data
-    del ClientDict[key[0]]
-
-    # unlock thread
-    print('CachingfromDict: about to unlock')
-    Lock.release()
-    return frameCache
-
-
-def ProcessFrames(key):
-    '''
-     When given a the key from a dictionary, retrieves frames thread-safely and pops them from the dict,
-     then performs decoding, timing to show frames as a video
-    '''
-    print('very start of ProcessFrames')
+    previoustime = threading.local()
+    previoustime.t = 0.01
     fps, st, frames_to_count, cnt = (0, 0, 20, 0)
 
     print('Start Processing')
-    # iterate over frames in cache
+    # iterate over frames in dictionary key
     while True:
-        print('value of key in while loop, before CacheandClearDict()')
-        print(key)
-        frameCache = CacheandClearDict([key])
-        for i in range(len(frameCache)):
-            data = base64.b64decode(frameCache[i], ' /')
-            npdata = np.fromstring(data, dtype=np.uint8)
-            frame = cv.imdecode(npdata, 1)
-            frame = cv.putText(frame, 'FPS: ' + str(fps), (10, 40), cv.FONT_HERSHEY_SIMPLEX, 0.7, (0, 0, 255), 2)
+        # start of process loop
+        for i in range(len(ClientDict[clientid])):
+            # iterating through frames
+
+            frame = cv.putText(ClientDict[clientid][i], 'FPS: ' + str(fps), (10, 40), cv.FONT_HERSHEY_SIMPLEX, 0.7, (0, 0, 255), 2)
+            previoustime.t = fpsMaintainer(10, previoustime.t)
             cv.imshow("RECEIVING VIDEO", frame)
+
             key = cv.waitKey(1) & 0xFF
             if key == ord('q'):
                 #threadsocket.close()
                 break
-            if cnt == frames_to_count:
-                try:
-                    fps = round(frames_to_count / (time.time() - st))
-                    st = time.time()
-                    cnt = 0
-                except:
-                    pass
-            cnt += 1
-
-    # go back and delete same elements from framecache and updating framecache
 
 
 def socketReceive():
@@ -159,7 +141,6 @@ def socketReceive():
         assembledPayload = bytes('', 'utf-8')
         incomingPacket = server_socket.recvfrom(BUFF_SIZE)      # in tuple form (buffer, (source_ip, port))
         header = struct.unpack('!h?8sI', incomingPacket[0])
-        print(header)
         print('Received Header')
 
         while header[0] != payloadLength:
@@ -169,10 +150,9 @@ def socketReceive():
 
             # combine current payload with last payload and loop if payload isn't length specified by header
             payloadLength += len(receivedPayload[0])
-            payload = base64.b64decode(receivedPayload[0], ' /')
+            payload = base64.b64decode(receivedPayload[0], ' /')        # conversion to bytes allows for easy conc.(?)
             assembledPayload += payload
 
-        print(assembledPayload)
         sortPacket(assembledPayload, header)
 
 

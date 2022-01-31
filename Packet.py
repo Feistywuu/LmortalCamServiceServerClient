@@ -73,9 +73,9 @@ class Packet:
 
         if len(self.raw) >= buffersize:
 
-            # get data, slice byte-string into 65316 slices and make room for the header
-            payload = self.raw[header_length:buffersize-header_length]
-            remainder = self.raw[buffersize-header_length:]
+            # get data, slice byte-string into 65316 slices
+            payload = self.raw[:buffersize+1]
+            remainder = self.raw[buffersize+1:]
 
             # add first partition to dict. of partitions
             self.payloadPartitions[n] = payload
@@ -85,8 +85,8 @@ class Packet:
 
             # split and add remaining payload to dictionary, iterating until there is one partitions worth left
             while len(remainder) >= buffersize:
-                self.payloadPartitions[n] = remainder[:buffersize-header_length]
-                remainder = remainder[buffersize-header_length:]
+                self.payloadPartitions[n] = remainder[:buffersize+1]
+                remainder = remainder[buffersize+1:]
                 n = int(n)
                 n += 1
                 n = str(n)

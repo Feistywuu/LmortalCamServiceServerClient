@@ -41,13 +41,20 @@ import Packet as packet
 # so the question is considering thread order and such
 
 ' Current'
-# use header info in sort packets
-
+# frames not displaying at fps between threads
+#   fix time
+#   how do we ensure there is sufficient pause between frames - a pause which also allows threads to switch.
+#   sleep() function
+#   make function to determine fps
+#       say we sleep for difference in current time and desired break time - what if thread isn't immediatedly taken up?
+#       thus how to solve when threads cannot keep up fps?
 # work on threading and handling incoming packets
-#   as long as frames are deposited/processed FIFO, we only need locks when appending to dictionary.
-#   locking might not be required since information only flows one way - tree
+#   as long as frames are deposited/processed FIFO, we only need locks when appending to dictionary, since information
+#only flows one way - tree
 
-#       will need to check payloadAssembler with a bigger packet at some point
+
+# In range(len(list)): can the list value change between iterations if list is modified?
+# will need to check payloadAssembler with a bigger packet at some point
 
 
 def request_handler():
@@ -84,27 +91,6 @@ if __name__ == "__main__":
 
     # spawn thread for tkinter gui
     #later
-
-    # order does not matter in Q, as long as all are completed, then socketreceive is updated
-
-    # main frame processing loop, iterates over thread list
-    while True:
-
-        for thread in socketSendAndReceive.Threads:
-            # put threads into queue
-            print("inserting job into the queue: %s" % thread)
-            queue.put(thread)
-
-        for i in range(len(socketSendAndReceive.Threads)):
-            # cache and clear
-            pass
-
-
-            # execute
-
-
-        pass
-
 
     # have button in the gui to stop listening - join() request_handler thread.
     #x.join()
