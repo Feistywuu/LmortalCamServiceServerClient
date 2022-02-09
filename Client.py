@@ -1,6 +1,13 @@
+# UI and functionality for clients to grab their video device data and send it via python .socket.
+
 import tkinter as tk
 import cv2 as cv
-import socketSendAndReceive
+import Functions
+
+# Initializing Global Variables
+IdentityCode = Functions.id_generator()
+# BUFF_SIZE = 65516                 actual BUFF_SIZE = 65536, but 20 bytes to make space for socket header
+
 
 
 def TestCamera():
@@ -30,6 +37,8 @@ def TestCamera():
     cap.release()
     cv.destroyAllWindows()
 
+# select video device dropdown box
+
 
 class GUI:
 
@@ -43,12 +52,13 @@ class GUI:
         self.master.title("LmortalCamsService")
 
         # send video data via socket
-        self.buttonTest = tk.Button(text='SendRequest', command=(lambda: socketSendAndReceive.socketSend('192.168.1.160')))
+        self.buttonTest = tk.Button(text='SendRequest', command=(lambda: Functions.socketSend(IdentityCode, '192.168.1.160')))
         self.canvas.create_window(330, 50, window=self.buttonTest)
 
         # capture video from device
         self.buttonTest = tk.Button(text='Camera', command=TestCamera)
         self.canvas.create_window(200, 100, window=self.buttonTest)
+
 
 
 master = tk.Tk()

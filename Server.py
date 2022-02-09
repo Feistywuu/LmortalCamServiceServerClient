@@ -1,79 +1,75 @@
+# UI and main processing loop for server to receive packets and display them.
+
 from queue import *
 import threading
 import logging
-import socketSendAndReceive
-import Packet as packet
-
-' Musings '
-# Use cookie as a way of identification
+import Functions
 
 ' Plan of action'
-# create Handler that creates a thread for each request     - CURRENT
-#- placing stuff from buffer into their own lists
+
+# create client ui
+#       show device in UI
+#       dropdown box for device,quality,port,server ip
+#       receive 'connection established etc' - might require a cookie sent back from server with a variable changed?
+
 # create server ui
+#       display video information
+#       OR just go directly OBS
+
+# Get information to OBS, VLC
+#   How? via the socket we are receiving information on? If so, how does it discriminate between the data? Do we have
+#sort it and then transfer to OBS via a socket/other way?
 
 'Current'
+# First work out how to get video data to obs/vlc
+#Two ways:
+#(1): Get opencv data into rtmp/rvsp form using rtmp library, then send to a socket
+#(2): Get data into form valid for vlc, then use that VLC as source for OBS
 
-#Play around with threading and see how to sort the packets
+# https://stackoverflow.com/questions/62769828/ffmpeg-stream-video-to-rtmp-from-frames-opencv-python
+#Trying (1):
+#look at ffmpeg
+#   receive raw video data, use opencv to get required properties from data
+#   define ffmpeg command with all the parameters
+#   subprocess module to run command line inside python and pipe to file output, etc
+#       using popen (pipe open?), look at subprocess and pipe
+#       what is a pipe, can you write to specific address/port
+#           open pipe with popen; std.write() to write to the pipe
+#   write to the pipe, using stdin.write()
+#   how is the pipe tied to an address? What is the pipe? Can we create pipe to a socket?
+#       define url 'rtmp ip:port'
 
-# might need to implement a pause function to impose fps
-# might need to figure out how to update framecache while 'While' loop is running?
-# might have to consider when thread deletes from ClientDict, then same thread runs before it is updated by the main
+#   !!!!!!!! Might require file stream to be written to a streaming file directory, this will need to create
+# rtmp server
+#test trivial command with pipe and subprocess in debug
 
-# KeyError 255: which is a lookup error in the dictionary for python, caused when While added? Some thread-sharing
-#issues?
-# might want to consider deleting the value at key value, not key itself to preserve thread.
+#command not working, not calling ffmpeg correctly? or command param. wrong?
 
-#inserts integer 255 after first attempt at print(CLientdict[key[0]])
-#why? max value of an 8-byte value
+' Current2'
+# test server with one client, replacing showing frames segment with ffmpeg push - skipping sort packets
+# Steps taken after VideoCapture:
+#      imutils.resize(), cv.imencode(), b64encode(), building into Packet(). >>> , 64decode,, np.fromstring(), cv. imdecode()
 
-# after 'del' on first run-through, creates clientList key:value again, but key is now [255]?
+#play around with param. order
 
-# progression of key[0]
-# '192.167.1.191 > [255] > 255 > error
-#!!! related to being in the while loop, not updating?
-
-# Thread(1):
-    #while ProcessFrames():
-        #CacheandClearDict()
-
-# Error [255] occurs when CacheAndClearDict runs, deletes, then runs again before ClientDict is refilled.
-# so the question is considering thread order and such
-
-' Current'
-# frames not displaying at fps between threads
-#   fix time
-#   how do we ensure there is sufficient pause between frames - a pause which also allows threads to switch.
-#   sleep() function
-#   make function to determine fps
-#       say we sleep for difference in current time and desired break time - what if thread isn't immediatedly taken up?
-#       thus how to solve when threads cannot keep up fps?
-# work on threading and handling incoming packets
-#   as long as frames are deposited/processed FIFO, we only need locks when appending to dictionary, since information
-#only flows one way - tree
+# not receiving data in as a CAPTURE OBJECT?
 
 
-# In range(len(list)): can the list value change between iterations if list is modified?
+
+
+#client ui - device, quality, server port,ip
+# something weird with time, but currently working nevertheless
+# send cookies back to client with information.
+# might have to use multiprocessing with multithreading to sustain computation of 5 threads videos at same time.
 # will need to check payloadAssembler with a bigger packet at some point
+# put fps from 10 to 30
 
-
-def request_handler():
-    ''' Solution?
-    # Buffer will be a global variable
-    # Multiple threads can access it using a lock system of some sort, thus each thread will be doing the
-    # 'sorting' per say, iterating through buffer to grab frames valid for it?
-    '''
-
-    # receive individual packet, with ip data
-
-    # append each packet to a list defined by ip
-    #create thread to deal with list defined by ip:
-    #If list has to be created then spawn thread? Else, just append to list
-
-    # maybe turn this into a bool state, then thread can be created in that file
-    socketSendAndReceive.socketReceive()
-
-
+" Initializing Global Variables "
+# Dictionary holding {clientID;video frames} key;value pairs.
+# ClientDict must be FIFO, as of 3.7 python dict is now ordered; ClientDict = { clientID;[frame1, ..., frameN] , ...}
+JobList = []
+ClientDict = {}
+Threads = []
 
 
 # need to change file name?
@@ -85,9 +81,24 @@ if __name__ == "__main__":
     logging.basicConfig(format=format1, level=logging.INFO,
                         datefmt="%H:%M:%S")
 
-    # spawn thread for request_handler
-    x = threading.Thread(target=request_handler, args=())
-    x.start()
+    # create job to put in queue
+    JobList.append(Functions.socketReceive(ClientDict, Threads))
+
+    # main threading loop
+    while True:
+
+        # put jobs in queue
+        for job in JobList:
+            queue.put(job)
+
+        for i in range(len(JobList)):
+            thrd = threading.Thread(target=JobList[i])
+            thrd.setDaemon(True)
+            thrd.start()
+
+        queue.join()
+        # start each thread in list for each job
+
 
     # spawn thread for tkinter gui
     #later
@@ -192,6 +203,19 @@ if __name__ == "__main__":
 #try sending with scapy and receiving with socket
 #YATTA! Can build a packet with specified source ip in scapy, and it is received with same source ip!!!
 
+After scrapping scapy****:
+
+# frames not displaying at fps between threads
+#   fix time
+#   how do we ensure there is sufficient pause between frames - a pause which also allows threads to switch.
+#   sleep() function
+#   make function to determine fps
+#       say we sleep for difference in current time and desired break time - what if thread isn't immediatedly taken up?
+#       thus how to solve when threads cannot keep up fps?
+#  SOLUTION - Use queues.
+#           could split receive and sort
+
+# In range(len(list)): can the list value change between iterations if list is modified?
 '''
 
 #What were the nuances behind the cookie?

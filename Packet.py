@@ -1,41 +1,6 @@
+# Packet class to wrap payload and header information in
 
-import random
-import string
 import struct
-import socket
-import base64
-
-''' to watch for '''
-# beware the scope of n
-# socket.sendto in packet send()
-
-
-def id_generator():
-    """
-    create client id at runtime that can be contained in packet header
-    id of form: 'xxxxxxxx', where x can be lower/upper character or number 0-9
-    thus of size, char = c: cccccccc
-    :return: str
-    """
-    # string 8 characters long
-    idString = ''
-
-    for x in range(0, 8):
-        deciderVar = random.randint(0, 1)
-        if deciderVar == 0:
-            letter = random.choice(string.ascii_letters)
-            idString = idString + letter
-        else:
-            number = random.choice(string.digits)
-            idString = idString + number
-
-    idString = bytes(idString, 'utf-8')
-    return idString
-
-
-IdentityCode = id_generator()
-PacketNumber = 0                            # tracker variable, which goes up every time a packet is made
-# BUFF_SIZE = 65516                 actual BUFF_SIZE = 65536, but 20 bytes to make space for socket header
 
 
 class Packet:
@@ -45,8 +10,7 @@ class Packet:
     cookie = (int,int) = unsigned int
     """
 
-    def __init__(self, data):
-        global PacketNumber
+    def __init__(self, data, identitycode, packetnumber):
 
         # internal values
         self.raw = data
@@ -55,8 +19,8 @@ class Packet:
         # header values
         self.length = len(data)
         self.udpTrue = 1
-        self.idcode = IdentityCode
-        self.packetnumber = PacketNumber
+        self.idcode = identitycode
+        self.packetnumber = packetnumber
 
 
     def partition(self, buffersize):
@@ -65,7 +29,6 @@ class Packet:
         otherwise return the payload as a string
         :return: dict or string
         """
-        global PacketNumber
 
         # provided payload is already in byteform
         n = '0'

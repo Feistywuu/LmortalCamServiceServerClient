@@ -1,5 +1,7 @@
-# Abstraction of .socket implementation of udp video data transfer
+# Assortment of Functions
 
+import random
+import string
 import socket
 import base64
 import cv2 as cv
@@ -7,28 +9,96 @@ import imutils
 import time
 import threading
 import numpy as np
-from copy import deepcopy
 import struct
 import Packet as packet
+import ffmpeg
+import subprocess
 
 
-# Dictionary holding {clientID;video frames} key;value pairs.
-# ClientDict must be FIFO, as of 3.7 python dict is now ordered.
-# CLientDict = { clientID;[frame1, ..., frameN] , ...}
-ClientDict = {}
-Threads = []
+# pushing frame data to rtmp socket
+def ffmpegPipe(framedata):
+    """
+    Receive raw video data from opencv functions
+    Define ffmpeg command with correct parameters
+    Use subprocess module to run command inside python and open a pipe where we can write our frame data
+    Write to the pipe
+    Pipe destination contains in ffmpeg command parameters?
+    :return: None
+    """
+    rtmp_url = "rtmp://127.0.0.1:1935/live/app"
+
+    # gather video information for ffmpeg
+    fps = 10            # or 30
+    width = 400
+    height = 300
+
+    # command/paramters for ffmpeg
+    #command = ['ffmpeg' '-f', 'flv', '-listen 1', '-i', 'rtmp://127.0.0.1:1935/live/app', '-c', 'copy', rtmp_url]
+
+    '''     #original 
+    command = ['ffmpeg',
+               '-y',
+               '-f', 'rawvideo',
+               '-vcodec', 'rawvideo',
+               '-pix_fmt', 'bgr24',
+               '-s', "{}x{}".format(width, height),
+               '-r', str(fps),
+               '-i', '-',
+               '-c:v', 'libx264',
+               '-pix_fmt', 'yuv420p',
+               '-preset', 'ultrafast',
+               '-f', 'flv',
+               rtmp_url]
+    '''
+
+    # ffmpeg [global_options] {[input_file_options] -i input_url} ... {[output_file_options] output_url} ...
+
+    command = ['ffmpeg',
+                '-y',
+                '-f', 'rawvideo',                       # global/input options
+                '-vcodec', 'rawvideo',
+                '-pix_fmt', 'bgr24',
+                '-s', "{}x{}".format(width, height),
+                '-r', str(fps),                           # force fps to stated value
+                '-i', '-',                              # input url from pipe
+                '-pix_fmt', 'yuv420p',                  # output file options
+                '-preset', 'ultrafast',
+                '-c:v', 'libx264',
+                '-f', 'flv',
+                '-listen', '1',
+                 rtmp_url]
 
 
-# order determined when they are added to threads list
-#   need to add main thread to this list somehow
-#   order of execute (for loop), will be defined in server, thus need to import Threads[].
-#   request_handler won't be part of Threads[]
-#   start
 
-# will need to create another thread for the gui in server
-# processframes needs to loop until there are no frames left to process, but if they all join before starting next jobs
-#some will have stopped will others are finishing, thus they have to be independent.
-# OR they don't join and wait for eachother.
+    # create subprocess to run command and open pipe
+    p = subprocess.Popen(command, stdin=subprocess.PIPE)
+
+    print(framedata)
+    p.stdin.write(framedata.tobytes())
+
+
+# miscellaneous Functions
+def id_generator():
+    """
+    create client id at runtime that can be contained in packet header
+    id of form: 'xxxxxxxx', where x can be lower/upper character or number 0-9
+    thus of size, char = c: cccccccc
+    :return: str
+    """
+    # string 8 characters long
+    idString = ''
+
+    for x in range(0, 8):
+        deciderVar = random.randint(0, 1)
+        if deciderVar == 0:
+            letter = random.choice(string.ascii_letters)
+            idString = idString + letter
+        else:
+            number = random.choice(string.digits)
+            idString = idString + number
+
+    idString = bytes(idString, 'utf-8')
+    return idString
 
 
 def fpsMaintainer(targetfps, previoustime):
@@ -57,7 +127,8 @@ def fpsMaintainer(targetfps, previoustime):
     return currentTime
 
 
-def sortPacket(mypacket, packetheader):
+# Sorting Packets/Payload Data
+def sortPacket(mypacket, packetheader, clientdictionary, joblist):
     '''
     All appends to dictionary will be to the end of the value list, ensures processing is FIFO.
     Takes a packet and packet header as an argument.
@@ -75,21 +146,21 @@ def sortPacket(mypacket, packetheader):
     clientID = packetheader[2].decode('utf-8')
 
     # check for id in dict
-    if clientID in ClientDict:
-        ClientDict[clientID].append(frame)
+    if clientID in clientdictionary:
+        clientdictionary.pop(clientID)
+        clientdictionary[clientID] = [frame]
+        joblist.append(ProcessFrames(clientID, clientdictionary))
         print('add to clientListKey: ' + clientID)
 
-    if clientID not in ClientDict:
-        ClientDict[clientID] = [frame]
-        print('created clientlist key: ' + str(id(ClientDict[clientID])))
+    if clientID not in clientdictionary:
+        clientdictionary[clientID] = [frame]
+        print('created clientlist key: ' + clientID)
 
         # add to threads list
-        x = threading.Thread(target=ProcessFrames, args=[clientID])
-        Threads.append(x)
-        x.start()
+        joblist.append(ProcessFrames(clientID, clientdictionary))
 
 
-def ProcessFrames(clientid):
+def ProcessFrames(clientid, clientdictionary):
     '''
     Will pop the frame from the bottom of the stack.
     When given a the key from a dictionary, retrieves frames thread-safely and pops them from the dict,
@@ -101,22 +172,21 @@ def ProcessFrames(clientid):
 
     print('Start Processing')
     # iterate over frames in dictionary key
-    while True:
-        # start of process loop
-        for i in range(len(ClientDict[clientid])):
-            # iterating through frames
+    for i in range(len(clientdictionary[clientid])):
+        # iterating through frames
 
-            frame = cv.putText(ClientDict[clientid][i], 'FPS: ' + str(fps), (10, 40), cv.FONT_HERSHEY_SIMPLEX, 0.7, (0, 0, 255), 2)
-            previoustime.t = fpsMaintainer(10, previoustime.t)
-            cv.imshow("RECEIVING VIDEO", frame)
+        frame = cv.putText(clientdictionary[clientid][i], 'FPS: ' + str(fps), (10, 40), cv.FONT_HERSHEY_SIMPLEX, 0.7, (0, 0, 255), 2)
+        previoustime.t = fpsMaintainer(10, previoustime.t)
+        cv.imshow("RECEIVING VIDEO", frame)
 
-            key = cv.waitKey(1) & 0xFF
-            if key == ord('q'):
-                #threadsocket.close()
-                break
+        key = cv.waitKey(1) & 0xFF
+        if key == ord('q'):
+            #threadsocket.close()
+            break
 
 
-def socketReceive():
+# Sending/building packets and Receiving packets
+def socketReceive(clientdictionary, joblist):
     ' Receive packets via .socket, initialize needed variables '
 
     # initialize variables
@@ -153,16 +223,22 @@ def socketReceive():
             payload = base64.b64decode(receivedPayload[0], ' /')        # conversion to bytes allows for easy conc.(?)
             assembledPayload += payload
 
-        sortPacket(assembledPayload, header)
+        npdata = np.fromstring(assembledPayload, dtype=np.uint8)
+        frame = cv.imdecode(npdata, 1)
+        ffmpegPipe(frame)
+        #sortPacket(assembledPayload, header, clientdictionary, joblist)
 
 
-def socketSend(serverIP=None):
+def socketSend(identitycode, serverIP=None):
     """"
     Send packets via .socket, initialize needed variables
+    Connects to socket, retrieves video data from computer, processes and encodes it.
+    Create packet + header class instance using the data
     """
 
     # initialize variables
     HOST, PORT = "192.168.1.160", 80
+    packetnumber = 0
 
     BUFF_SIZE = 65516
     client_socket = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
@@ -182,12 +258,14 @@ def socketSend(serverIP=None):
         while vid.isOpened():
             # get video frames, process
             _, frame = vid.read()
+            print(vid)
+            print(frame)
             frame = imutils.resize(frame, width=WIDTH)
             encoded, buffer = cv.imencode('.jpg', frame, [cv.IMWRITE_JPEG_QUALITY, 80])
             message1 = base64.b64encode(buffer)
 
             # create packet
-            myPacket = packet.Packet(message1)
+            myPacket = packet.Packet(message1, identitycode, packetnumber)
 
             # send header, then payload
             myPacket.send(BUFF_SIZE, client_socket, serverIP, port, header=True)
@@ -208,6 +286,7 @@ def socketSend(serverIP=None):
                 except:
                     pass
             cnt += 1
+            packetnumber += 1
 
 
 # Global Variable issue
