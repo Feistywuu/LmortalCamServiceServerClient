@@ -58,7 +58,7 @@ class Packet:
             if len(remainder) != 0:
                 self.payloadPartitions[n] = remainder[:]
 
-            PacketNumber += 1
+            self.packetnumber += 1
             self.raw = self.payloadPartitions
 
             return self.raw

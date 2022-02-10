@@ -16,43 +16,21 @@ import Functions
 #       display video information
 #       OR just go directly OBS
 
-# Get information to OBS, VLC
-#   How? via the socket we are receiving information on? If so, how does it discriminate between the data? Do we have
-#sort it and then transfer to OBS via a socket/other way?
 
 'Current'
-# First work out how to get video data to obs/vlc
-#Two ways:
-#(1): Get opencv data into rtmp/rvsp form using rtmp library, then send to a socket
-#(2): Get data into form valid for vlc, then use that VLC as source for OBS
+# fix delay to desired amount
+# fix stability issues
+# get debug to work on main implementation
+# adapt multithreading server to send frames, not show frames
+# fps to 30
 
-# https://stackoverflow.com/questions/62769828/ffmpeg-stream-video-to-rtmp-from-frames-opencv-python
-#Trying (1):
-#look at ffmpeg
-#   receive raw video data, use opencv to get required properties from data
-#   define ffmpeg command with all the parameters
-#   subprocess module to run command line inside python and pipe to file output, etc
-#       using popen (pipe open?), look at subprocess and pipe
-#       what is a pipe, can you write to specific address/port
-#           open pipe with popen; std.write() to write to the pipe
-#   write to the pipe, using stdin.write()
-#   how is the pipe tied to an address? What is the pipe? Can we create pipe to a socket?
-#       define url 'rtmp ip:port'
+' Issue '
+# Simple VidCapture() > While Vid(): works smoothly - FAST
+# Vidcapture() > processed > split into separate buffer > iterate over group of frames - SLOW
+# could maybe use the buffer interface
 
-#   !!!!!!!! Might require file stream to be written to a streaming file directory, this will need to create
-# rtmp server
-#test trivial command with pipe and subprocess in debug
 
-#command not working, not calling ffmpeg correctly? or command param. wrong?
-
-' Current2'
-# test server with one client, replacing showing frames segment with ffmpeg push - skipping sort packets
-# Steps taken after VideoCapture:
-#      imutils.resize(), cv.imencode(), b64encode(), building into Packet(). >>> , 64decode,, np.fromstring(), cv. imdecode()
-
-#play around with param. order
-
-# not receiving data in as a CAPTURE OBJECT?
+# !!! close pipe at some point later***
 
 
 

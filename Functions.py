@@ -32,49 +32,28 @@ def ffmpegPipe(framedata):
     width = 400
     height = 300
 
-    # command/paramters for ffmpeg
-    #command = ['ffmpeg' '-f', 'flv', '-listen 1', '-i', 'rtmp://127.0.0.1:1935/live/app', '-c', 'copy', rtmp_url]
-
-    '''     #original 
     command = ['ffmpeg',
                '-y',
-               '-f', 'rawvideo',
+               '-f', 'rawvideo',                            # global/input options
                '-vcodec', 'rawvideo',
                '-pix_fmt', 'bgr24',
                '-s', "{}x{}".format(width, height),
-               '-r', str(fps),
-               '-i', '-',
-               '-c:v', 'libx264',
-               '-pix_fmt', 'yuv420p',
+               '-r', str(fps),                              # force fps to stated value
+               '-i', '-',                                   # input url from pipe
+               '-pix_fmt', 'yuv420p',                       # output file options
                '-preset', 'ultrafast',
+               '-c:v', 'libx264',
                '-f', 'flv',
+               '-listen', '1',
                rtmp_url]
-    '''
-
-    # ffmpeg [global_options] {[input_file_options] -i input_url} ... {[output_file_options] output_url} ...
-
-    command = ['ffmpeg',
-                '-y',
-                '-f', 'rawvideo',                       # global/input options
-                '-vcodec', 'rawvideo',
-                '-pix_fmt', 'bgr24',
-                '-s', "{}x{}".format(width, height),
-                '-r', str(fps),                           # force fps to stated value
-                '-i', '-',                              # input url from pipe
-                '-pix_fmt', 'yuv420p',                  # output file options
-                '-preset', 'ultrafast',
-                '-c:v', 'libx264',
-                '-f', 'flv',
-                '-listen', '1',
-                 rtmp_url]
-
-
 
     # create subprocess to run command and open pipe
     p = subprocess.Popen(command, stdin=subprocess.PIPE)
 
-    print(framedata)
-    p.stdin.write(framedata.tobytes())
+    for frame in framedata:
+        p.stdin.write(framedata)
+
+
 
 
 # miscellaneous Functions
@@ -249,6 +228,10 @@ def socketSend(identitycode, serverIP=None):
 
     vid = cv.VideoCapture(0)
 
+    print(vid.get(cv.CAP_PROP_FPS))
+    print(vid.get(cv.CAP_PROP_FRAME_WIDTH))
+    print(vid.get(cv.CAP_PROP_FRAME_HEIGHT))
+
     client_socket.connect((host_ip, port))
 
     fps, st, frames_to_count, cnt = (0, 0, 20, 0)
@@ -258,8 +241,6 @@ def socketSend(identitycode, serverIP=None):
         while vid.isOpened():
             # get video frames, process
             _, frame = vid.read()
-            print(vid)
-            print(frame)
             frame = imutils.resize(frame, width=WIDTH)
             encoded, buffer = cv.imencode('.jpg', frame, [cv.IMWRITE_JPEG_QUALITY, 80])
             message1 = base64.b64encode(buffer)
