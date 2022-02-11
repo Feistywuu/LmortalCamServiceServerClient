@@ -16,7 +16,7 @@ import subprocess
 
 
 # pushing frame data to rtmp socket
-def ffmpegPipe(framedata):
+def ffmpegPipe(clientid, framedict):
     """
     Receive raw video data from opencv functions
     Define ffmpeg command with correct parameters
@@ -27,8 +27,12 @@ def ffmpegPipe(framedata):
     """
     rtmp_url = "rtmp://127.0.0.1:1935/live/app"
 
+    #video data
+    framedata = framedict[clientid]
+    print(framedata)
+
     # gather video information for ffmpeg
-    fps = 10            # or 30
+    fps = 10
     width = 400
     height = 300
 
@@ -50,10 +54,9 @@ def ffmpegPipe(framedata):
     # create subprocess to run command and open pipe
     p = subprocess.Popen(command, stdin=subprocess.PIPE)
 
-    for frame in framedata:
-        p.stdin.write(framedata)
-
-
+    while framedict[clientid]:
+        for frame in framedata:
+            p.stdin.write(frame.tobytes())
 
 
 # miscellaneous Functions
@@ -80,32 +83,6 @@ def id_generator():
     return idString
 
 
-def fpsMaintainer(targetfps, previoustime):
-    """
-    Function to sleep thread according to desired fps.
-    Starts recording time spent from first function call, when returning to function call again, sleep() thread
-    if amount of time required to set a desired fps is needed.
-    :return: time at specific point in function = int
-    """
-    print('FPS Check')
-
-    # start recording time, with time()
-    currentTime = time.time()
-
-    # check value of 1/fps and compare value to time passed since last function call
-    elapsedTime = currentTime - previoustime
-    desiredSleep = 1 / targetfps
-    print(elapsedTime)
-
-    try:
-        time.sleep(desiredSleep - elapsedTime)
-        print(time.sleep(desiredSleep - elapsedTime))
-    except ValueError:
-        print('No sleep')
-
-    return currentTime
-
-
 # Sorting Packets/Payload Data
 def sortPacket(mypacket, packetheader, clientdictionary, joblist):
     '''
@@ -128,40 +105,16 @@ def sortPacket(mypacket, packetheader, clientdictionary, joblist):
     if clientID in clientdictionary:
         clientdictionary.pop(clientID)
         clientdictionary[clientID] = [frame]
-        joblist.append(ProcessFrames(clientID, clientdictionary))
+        joblist.append(ffmpegPipe(clientID, clientdictionary))
         print('add to clientListKey: ' + clientID)
+        return
 
     if clientID not in clientdictionary:
         clientdictionary[clientID] = [frame]
         print('created clientlist key: ' + clientID)
 
         # add to threads list
-        joblist.append(ProcessFrames(clientID, clientdictionary))
-
-
-def ProcessFrames(clientid, clientdictionary):
-    '''
-    Will pop the frame from the bottom of the stack.
-    When given a the key from a dictionary, retrieves frames thread-safely and pops them from the dict,
-    then performs decoding, timing to show frames as a video
-    '''
-    previoustime = threading.local()
-    previoustime.t = 0.01
-    fps, st, frames_to_count, cnt = (0, 0, 20, 0)
-
-    print('Start Processing')
-    # iterate over frames in dictionary key
-    for i in range(len(clientdictionary[clientid])):
-        # iterating through frames
-
-        frame = cv.putText(clientdictionary[clientid][i], 'FPS: ' + str(fps), (10, 40), cv.FONT_HERSHEY_SIMPLEX, 0.7, (0, 0, 255), 2)
-        previoustime.t = fpsMaintainer(10, previoustime.t)
-        cv.imshow("RECEIVING VIDEO", frame)
-
-        key = cv.waitKey(1) & 0xFF
-        if key == ord('q'):
-            #threadsocket.close()
-            break
+        joblist.append(ffmpegPipe(clientID, clientdictionary))
 
 
 # Sending/building packets and Receiving packets
@@ -188,6 +141,7 @@ def socketReceive(clientdictionary, joblist):
         # receive first header, unpack, get length of payload
         payloadLength = 0
         assembledPayload = bytes('', 'utf-8')
+
         incomingPacket = server_socket.recvfrom(BUFF_SIZE)      # in tuple form (buffer, (source_ip, port))
         header = struct.unpack('!h?8sI', incomingPacket[0])
         print('Received Header')
@@ -202,10 +156,7 @@ def socketReceive(clientdictionary, joblist):
             payload = base64.b64decode(receivedPayload[0], ' /')        # conversion to bytes allows for easy conc.(?)
             assembledPayload += payload
 
-        npdata = np.fromstring(assembledPayload, dtype=np.uint8)
-        frame = cv.imdecode(npdata, 1)
-        ffmpegPipe(frame)
-        #sortPacket(assembledPayload, header, clientdictionary, joblist)
+        sortPacket(assembledPayload, header, clientdictionary, joblist)
 
 
 def socketSend(identitycode, serverIP=None):

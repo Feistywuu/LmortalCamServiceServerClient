@@ -24,11 +24,17 @@ import Functions
 # adapt multithreading server to send frames, not show frames
 # fps to 30
 
+#Pipes:
+# sortpackets() - create subprocess.popen(), stdin.write() frame from buffer into pipe, stdout.() > tempfile
+# while(tempfile exists): read from tempfile > write to pipe > run subprocess
+
 ' Issue '
 # Simple VidCapture() > While Vid(): works smoothly - FAST
 # Vidcapture() > processed > split into separate buffer > iterate over group of frames - SLOW
 # could maybe use the buffer interface
+# socketRECV() only processes 1 frame and header for iteration, is there a quicker way?
 
+# relying on so many subprocesses
 
 # !!! close pipe at some point later***
 
