@@ -1,5 +1,5 @@
 # Assortment of Functions
-
+import os
 import random
 import string
 import socket
@@ -14,8 +14,40 @@ import Packet as packet
 import ffmpeg
 import subprocess
 
+# recv data, if new client id, init process and ffmpeg subprocesses
+# write to process stdin.
 
-# pushing frame data to rtmp socket
+# merge sortpackets with recv
+# move decode/processing to ffmpeg side - if needed
+# dummy process frame function for now
+
+#/Only issue is if trouble reading empty stdin.
+
+
+# pipe and processing functions
+def ProcessFrames():
+    """
+    Processing frames before piping to ffmpeg
+    :return:
+    """
+    pass
+
+
+def SubprocessInit(function, inputsubprocess=None):
+    """
+    Initialize new subprocess with attached pipes and function, unless subprocess pipe is provided.
+    :return: subprocess
+    """
+
+    if not inputsubprocess:
+        p = subprocess.Popen(function, stdin=subprocess.PIPE, stdout=subprocess.PIPE)
+
+    else:
+        p = subprocess.Popen(function, stdin=inputsubprocess.PIPE, stdout=subprocess.PIPE)
+
+    return p
+
+
 def ffmpegPipe(clientid, framedict):
     """
     Receive raw video data from opencv functions
@@ -84,7 +116,7 @@ def id_generator():
 
 
 # Sorting Packets/Payload Data
-def sortPacket(mypacket, packetheader, clientdictionary, joblist):
+def sortPacket(mypacket, packetheader, clientlist):
     '''
     All appends to dictionary will be to the end of the value list, ensures processing is FIFO.
     Takes a packet and packet header as an argument.
@@ -94,6 +126,8 @@ def sortPacket(mypacket, packetheader, clientdictionary, joblist):
     '''
     print('Sorting Packets')
 
+    cwd = os.getcwd()
+
     payload = mypacket
     npdata = np.fromstring(payload, dtype=np.uint8)
     frame = cv.imdecode(npdata, 1)
@@ -102,19 +136,24 @@ def sortPacket(mypacket, packetheader, clientdictionary, joblist):
     clientID = packetheader[2].decode('utf-8')
 
     # check for id in dict
-    if clientID in clientdictionary:
-        clientdictionary.pop(clientID)
-        clientdictionary[clientID] = [frame]
-        joblist.append(ffmpegPipe(clientID, clientdictionary))
+    if clientID in clientlist:
+
+        # write to stdin.
         print('add to clientListKey: ' + clientID)
         return
 
-    if clientID not in clientdictionary:
-        clientdictionary[clientID] = [frame]
+    if clientID not in clientlist:
+        clientlist[clientID] = [frame]
         print('created clientlist key: ' + clientID)
 
+        # create file
+        f = open("TemporaryBufferClient" + str(clientID), "x")
+
+        # start subprocess
+        subproc = subprocess.Popen("python")
+        # write to stdin.
         # add to threads list
-        joblist.append(ffmpegPipe(clientID, clientdictionary))
+        joblist.append(ffmpegPipe(clientID, clientlist))
 
 
 # Sending/building packets and Receiving packets
@@ -156,7 +195,7 @@ def socketReceive(clientdictionary, joblist):
             payload = base64.b64decode(receivedPayload[0], ' /')        # conversion to bytes allows for easy conc.(?)
             assembledPayload += payload
 
-        sortPacket(assembledPayload, header, clientdictionary, joblist)
+        sortPacket(assembledPayload, header, clientdictionary)
 
 
 def socketSend(identitycode, serverIP=None):

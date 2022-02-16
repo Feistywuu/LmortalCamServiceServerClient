@@ -34,6 +34,8 @@ import Functions
 # could maybe use the buffer interface
 # socketRECV() only processes 1 frame and header for iteration, is there a quicker way?
 
+# mixing 'python' from command line in popen with python interpreter in pycharm
+
 # relying on so many subprocesses
 
 # !!! close pipe at some point later***
@@ -51,8 +53,7 @@ import Functions
 " Initializing Global Variables "
 # Dictionary holding {clientID;video frames} key;value pairs.
 # ClientDict must be FIFO, as of 3.7 python dict is now ordered; ClientDict = { clientID;[frame1, ..., frameN] , ...}
-JobList = []
-ClientDict = {}
+Clients = []
 Threads = []
 
 
