@@ -13,55 +13,67 @@ import struct
 import Packet as packet
 import ffmpeg
 import subprocess
-
-# recv data, if new client id, init process and ffmpeg subprocesses
-# write to process stdin.
+import sys
+import config
 
 # merge sortpackets with recv
 # move decode/processing to ffmpeg side - if needed
-# dummy process frame function for now
+# use multiprocessing for gui and socketrecv maybe
+# when do we close pipes?
+# get vid properties for ffmpeg before info is piped.
+# issue if trouble reading empty stdin.
 
-#/Only issue is if trouble reading empty stdin.
+""" check data format states """
+
+# missing:
+#npdata = np.fromstring(payload, dtype=np.uint8)
+#frame = cv.imdecode(npdata, 1)
+#   - does this matter?
+
+'Errors'
+# OSError: [Errno 22] Invalid argument
+# [rawvideo @ 0000017167043880] Packet corrupt (stream = 0, dts = 0). \\\\ probably wrong packet form
+
+# - Works When:
+#/ VideoCapture() > ToBytes() > ffmpeg()
+
+# - Currently:
+# VideoCapture() > imutils.resize() > imencode() > b64encode()
+# packetPartition/putting back together() > b64decode() > imdecode() > [ ToBytes() > stdin/bufferform ]
+
+# NEED TO READ io.TEXTBUFFER AT START OF FFMPEG
+# ffmpeg function will receive io.textwrapper, need to decode within that function?
+#   /might be okay because that is what happens already - how does ffmpeg read stdin data?
+
+' Current'
+# compare base64 on client and server side
+# see how it differs from what goes into debug.
+
+""" Options """
+# make python script that takes stdin, then runs command line ffmpeg, so many another subprocess?
+#   /still requires information to be passed to the stdin, thus buffered.
+
+# what forms does ffmpeg receive, maybe there's one that accepts bufferstream?
+
+# Look at debug.py and see form when it works and compare to model.
+
+# packet corrupt, need function that can check frame data isolated.
+
+# maybe imutils changes to np array form which is why it's needed
 
 
 # pipe and processing functions
-def ProcessFrames():
+def ffmpegPipeInit(subproc, vidproperties=None):
     """
-    Processing frames before piping to ffmpeg
-    :return:
-    """
-    pass
-
-
-def SubprocessInit(function, inputsubprocess=None):
-    """
-    Initialize new subprocess with attached pipes and function, unless subprocess pipe is provided.
-    :return: subprocess
-    """
-
-    if not inputsubprocess:
-        p = subprocess.Popen(function, stdin=subprocess.PIPE, stdout=subprocess.PIPE)
-
-    else:
-        p = subprocess.Popen(function, stdin=inputsubprocess.PIPE, stdout=subprocess.PIPE)
-
-    return p
-
-
-def ffmpegPipe(clientid, framedict):
-    """
+    Receives data from a previous pipe, with subproc as the argument.
     Receive raw video data from opencv functions
     Define ffmpeg command with correct parameters
     Use subprocess module to run command inside python and open a pipe where we can write our frame data
     Write to the pipe
     Pipe destination contains in ffmpeg command parameters?
-    :return: None
+    :return: subprocess
     """
     rtmp_url = "rtmp://127.0.0.1:1935/live/app"
-
-    #video data
-    framedata = framedict[clientid]
-    print(framedata)
 
     # gather video information for ffmpeg
     fps = 10
@@ -84,11 +96,9 @@ def ffmpegPipe(clientid, framedict):
                rtmp_url]
 
     # create subprocess to run command and open pipe
-    p = subprocess.Popen(command, stdin=subprocess.PIPE)
+    p = subprocess.Popen(command, stdin=subproc.stdout)
 
-    while framedict[clientid]:
-        for frame in framedata:
-            p.stdin.write(frame.tobytes())
+    return p
 
 
 # miscellaneous Functions
@@ -116,48 +126,34 @@ def id_generator():
 
 
 # Sorting Packets/Payload Data
-def sortPacket(mypacket, packetheader, clientlist):
+def sortPacket(mypacket, clientid):
     '''
-    All appends to dictionary will be to the end of the value list, ensures processing is FIFO.
-    Takes a packet and packet header as an argument.
-    Processes the payload into easily displayable frame; appends packet to dictionary as a {client;id}.
-    Checks packet header for client id, if new client, create thread to process frames, append to dictionary;
-    if current client, just add to dictionary.
+    Creates subprocesses p1, p2, for each new client with a defined pipeline with functions - ffmpeg - along the way,
+    eventually piped to a rtmp server.
     '''
-    print('Sorting Packets')
 
-    cwd = os.getcwd()
+    print('debug1')
 
-    payload = mypacket
-    npdata = np.fromstring(payload, dtype=np.uint8)
+    # init ffmpeg process /w pipes + sorting process w/pipes
+    p1 = subprocess.Popen([sys.executable, 'Process.py'], stdin=subprocess.PIPE, stdout=subprocess.PIPE)
+    print('debug2')
+    p2 = ffmpegPipeInit(p1)
+    print('debug3')
+
+    # append to dict
+    config.ClientDict[clientid].append([p1, p2])
+
+    # write to stdin of first pipe - subproc
+    print(mypacket)
+    npdata = np.fromstring(mypacket, dtype=np.uint8)
     frame = cv.imdecode(npdata, 1)
-
-    # converting from bytes to string
-    clientID = packetheader[2].decode('utf-8')
-
-    # check for id in dict
-    if clientID in clientlist:
-
-        # write to stdin.
-        print('add to clientListKey: ' + clientID)
-        return
-
-    if clientID not in clientlist:
-        clientlist[clientID] = [frame]
-        print('created clientlist key: ' + clientID)
-
-        # create file
-        f = open("TemporaryBufferClient" + str(clientID), "x")
-
-        # start subprocess
-        subproc = subprocess.Popen("python")
-        # write to stdin.
-        # add to threads list
-        joblist.append(ffmpegPipe(clientID, clientlist))
+    print(frame)
+    p1.stdin.write(frame.tobytes())
+    print('debug4')
 
 
 # Sending/building packets and Receiving packets
-def socketReceive(clientdictionary, joblist):
+def socketReceive():
     ' Receive packets via .socket, initialize needed variables '
 
     # initialize variables
@@ -192,14 +188,23 @@ def socketReceive(clientdictionary, joblist):
 
             # combine current payload with last payload and loop if payload isn't length specified by header
             payloadLength += len(receivedPayload[0])
+            print(receivedPayload[0])
             payload = base64.b64decode(receivedPayload[0], ' /')        # conversion to bytes allows for easy conc.(?)
             assembledPayload += payload
 
-        sortPacket(assembledPayload, header, clientdictionary)
+
+        # check if new client, if so create subprocesses and pipes
+        clientID = header[2].decode('utf-8')
+        if clientID not in config.ClientDict:
+
+            # init both subprocess and write to pipe.stdin
+            sortPacket(assembledPayload, clientID)
+
+        print('testing recvloop')
 
 
-def socketSend(identitycode, serverIP=None):
-    """"
+def socketSend(identitycode, serverip=None):
+    """
     Send packets via .socket, initialize needed variables
     Connects to socket, retrieves video data from computer, processes and encodes it.
     Create packet + header class instance using the data
@@ -234,16 +239,18 @@ def socketSend(identitycode, serverIP=None):
             frame = imutils.resize(frame, width=WIDTH)
             encoded, buffer = cv.imencode('.jpg', frame, [cv.IMWRITE_JPEG_QUALITY, 80])
             message1 = base64.b64encode(buffer)
+            print(message1)
 
             # create packet
             myPacket = packet.Packet(message1, identitycode, packetnumber)
 
             # send header, then payload
-            myPacket.send(BUFF_SIZE, client_socket, serverIP, port, header=True)
-            myPacket.send(BUFF_SIZE, client_socket, serverIP, port)
+            myPacket.send(BUFF_SIZE, client_socket, serverip, port, header=True)
+            myPacket.send(BUFF_SIZE, client_socket, serverip, port)
 
             frame = cv.putText(frame, 'FPS: ' + str(fps), (10, 40), cv.FONT_HERSHEY_SIMPLEX, 0.7, (0, 0, 255),
                                2)
+            print(frame)
             cv.imshow('TRANSMITTING VIDEO', frame)
             key = cv.waitKey(1) & 0xFF
             if key == ord('q'):

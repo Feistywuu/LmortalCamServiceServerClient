@@ -50,11 +50,6 @@ import Functions
 # will need to check payloadAssembler with a bigger packet at some point
 # put fps from 10 to 30
 
-" Initializing Global Variables "
-# Dictionary holding {clientID;video frames} key;value pairs.
-# ClientDict must be FIFO, as of 3.7 python dict is now ordered; ClientDict = { clientID;[frame1, ..., frameN] , ...}
-Clients = []
-Threads = []
 
 
 # need to change file name?
@@ -66,24 +61,8 @@ if __name__ == "__main__":
     logging.basicConfig(format=format1, level=logging.INFO,
                         datefmt="%H:%M:%S")
 
-    # create job to put in queue
-    JobList.append(Functions.socketReceive(ClientDict, Threads))
-
-    # main threading loop
-    while True:
-
-        # put jobs in queue
-        for job in JobList:
-            queue.put(job)
-
-        for i in range(len(JobList)):
-            thrd = threading.Thread(target=JobList[i])
-            thrd.setDaemon(True)
-            thrd.start()
-
-        queue.join()
-        # start each thread in list for each job
-
+    # create main socket recv thread
+    thrd = threading.Thread(target=Functions.socketReceive())
 
     # spawn thread for tkinter gui
     #later

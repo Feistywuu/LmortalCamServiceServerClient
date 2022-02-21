@@ -1,6 +1,5 @@
 # unused functions
 
-
 def ProcessFrames(clientid, clientdictionary):
     '''
     Will pop the frame from the bottom of the stack.
