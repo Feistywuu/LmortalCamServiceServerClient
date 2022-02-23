@@ -50,3 +50,18 @@ def fpsMaintainer(targetfps, previoustime):
 
     return currentTime
 
+
+command = ['ffmpeg',
+               '-y',
+               '-f', 'rawvideo',                            # global/input options
+               '-vcodec', 'rawvideo',
+               '-pix_fmt', 'bgr24',
+               '-s', "{}x{}".format(width, height),
+               '-r', str(fps),                              # force fps to stated value
+               '-i', '-',                                   # input url from pipe
+               '-pix_fmt', 'yuv420p',                       # output file options
+               '-preset', 'ultrafast',
+               '-c:v', 'libx264',
+               '-f', 'flv',
+               '-listen', '1',
+               rtmp_url]

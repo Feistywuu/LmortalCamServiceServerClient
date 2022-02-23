@@ -80,7 +80,7 @@ class Packet:
         """
         # determine whether header or payload
         if header:
-
+            print(self.length)
             byteform = struct.pack('!h?8sI', self.length, self.udpTrue, self.idcode, self.packetnumber)
             test = struct.unpack('!h?8sI', byteform)
 
