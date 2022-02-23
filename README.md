@@ -10,8 +10,8 @@
 - BrokenPipeError: [Errno 32] Broken pipe
 - OSError: [Errno 22] Invalid argument - this is very rare though.
 - I think [Errno 32] is an I/O Error, something like the receiving pipe has an error which causes it to close;
-I thought this might because I was putting in the wrong video data, but then I changed it from 'rawvideo' to 'image2video' and
-it removed the packet corrupt error and kept [Errno 32], so I'm thinking it might be something else more basic to do with pipes.
+I thought this might because I was putting in the wrong video data, but then I changed ffmpeg param. from 'rawvideo' to 'image2video' and
+it removed the packet corrupt error and kept [Errno 32], so I'm thinking it might be something else more basic to do with pipes, like not using close() or something.
 
 
 ffmpegExample is the isolated function which works with the rawdata from videocapture(), whereas in my function
