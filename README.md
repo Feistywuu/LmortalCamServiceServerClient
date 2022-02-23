@@ -24,6 +24,5 @@ I encode it into jpg > base64 and back, but upon checking packets they remain af
 # Other Errors if you come across them
 - I was getting 'Packet corrupt (stream = 0, dts = 0)', when putting the .jpg imencode() data into the ffmpeg with 'rawvideo'
 so that makes sense, as i'm not getting that anymore with correct params.
-- /will throw error such as: struct.error: 'h' format requires -32768 <= number <= 32767, if you increae
-packet size by changing data to png/bmp since I haven't finished properly splitting the packets before sending.
+- will throw error such as: struct.error: 'h' format requires -32768 <= number <= 32767, if you increae packet size by changing data to png/bmp since I haven't finished properly splitting the packets before sending.
 
