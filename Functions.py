@@ -17,30 +17,21 @@ import sys
 import config
 import errno
 
-# merge sortpackets with recv
-# move decode/processing to ffmpeg side - if needed
-# use multiprocessing for gui and socketrecv maybe
-# when do we close pipes?
-# get vid properties for ffmpeg before info is piped.
-# issue if trouble reading empty stdin.
-
 """ check data format states """
-
-# missing:
-#npdata = np.fromstring(payload, dtype=np.uint8)
-#frame = cv.imdecode(npdata, 1)
-#   - does this matter?
+# Transformations done to data: data remains the same until the end OR if data requires partitioning.
+# VideoCapture() > imutils.resize() > imencode() > b64encode()
+# packetPartition/putting back together() > b64decode() > imdecode() > [ ToBytes() > stdin/bufferform ]
 
 'Errors'
 # BrokenPipeError: [Errno 32] Broken pipe
 # OSError: [Errno 22] Invalid argument - sometimes this is returned
 #   /Both of these errors apply to p1.stdin.write() line, checking frame integrity reveals:
-#       /that the frame shows fine with cv.imshow(), thus the issue in not with the frame itself. *DONE*
+#       /that the frame shows fine with cv.imshow() in isolation, thus the issue in not with the frame itself. *DONE*
 #   / Are these both just messages based on closing by ending the process? Thus differing at code pos. when closed.
 #       / NO, fails without closing *DONE*
 #   /Is data invalid form to placed into pipe? No *DONE*
 #   / It has to be related to the pipes - and how they are set up / linked together:
-#       /
+#       /related to not closing the p1.stdin?
 
 #   / Look at when BrokenPipeError happens - maybe trigger since wrong argument is put in ffmpeg (not jpeg valid,
 #   /which then causes the error)
@@ -57,10 +48,10 @@ import errno
 # Sympton of underlying somewhere else, probably.
 # maybe require stdin.close at some point?
 
-
-
-' Packet Corrupt'
+' Packet Corrupt - *DONE*?'
 # [rawvideo @ 0000020cc73a3880] Packet corrupt (stream = 0, dts = 0). returns without writing to pipe.
+#   /Upon changing to jpeg ffmpeg 'images2pipe' rather than 'rawvideo' packet corrupt doesn't appear, but still
+#   /returns BrokenPipeError.
 
 # Problem with popen being initialized with an empty stdin?
 
@@ -75,11 +66,15 @@ import errno
 #                           / or we change arguments in ffmpeg without imdecode()
 #                               / does imencode() change rgb etc format
 #                               / is colour change required after imdecode()
-#                                   /Probably not since ffmpeg returns invalid argument when bgr > rgb change***
+#                                   /Probably not since ffmpeg returns invalid argument when bgr > rgb change *DONE*
 
-# Transformations done to data: data remains the same until the end OR if data requires partitioning.
-# VideoCapture() > imutils.resize() > imencode() > b64encode()
-# packetPartition/putting back together() > b64decode() > imdecode() > [ ToBytes() > stdin/bufferform ]
+' vague to do'
+# merge sortpackets with recv
+# move decode/processing to subprocesses - if needed
+# use multiprocessing for gui and socketrecv maybe
+# when do we close pipes?
+# get vid properties for ffmpeg before info is piped.
+# issue if trouble reading empty stdin.
 
 
 # pipe and processing functions

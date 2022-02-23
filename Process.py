@@ -1,4 +1,5 @@
-# Takes stdin from recvfrom() and passes it along
+# function that the subprocess in charge of piping data from recvfrom > ffmpeg uses.
+# takes stdin from socketReceive() and passes it along
 
 import sys
 
