@@ -52,7 +52,7 @@ class GUI:
         self.master.title("LmortalCamsService")
 
         # send video data via socket
-        self.buttonTest = tk.Button(text='SendRequest', command=(lambda: Functions.socketSend(IdentityCode, '192.168.1.160')))
+        self.buttonTest = tk.Button(text='Send', command=(lambda: Functions.socketSend(IdentityCode, '192.168.1.160')))
         self.canvas.create_window(330, 50, window=self.buttonTest)
 
         # capture video from device
