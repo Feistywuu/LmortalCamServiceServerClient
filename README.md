@@ -1,5 +1,10 @@
 # LmortalCamService
  Client-Server pairs for UDP video streaming
+ 
+# Install
+pip install ffmpeg
+pip install opencv-python
+pip install imutils
 
 # How to use / How it works
 - Run server and client, client ui with 'send' button.
