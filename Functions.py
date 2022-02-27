@@ -10,12 +10,17 @@ import time
 import threading
 import numpy as np
 import struct
-import Packet as packet
 import ffmpeg
 import subprocess
 import sys
 import config
 import errno
+
+import Packet as packet
+
+
+from client2 import Client2
+from client2 import Packet2, PacketType
 
 """ check data format states """
 # Transformations done to data: data remains the same until the end OR if data requires partitioning.
@@ -141,6 +146,36 @@ def id_generator():
     return idString
 
 
+
+
+G = lambda: ...
+G.rtmp_url = "rtmp://127.0.0.1:1935/live/app"
+G.fps = 30
+G.width = 640
+G.height = 480
+
+
+#'-f', 'image2pipe',
+# '-r', str(fps),
+# '-vcodec', 'rawvideo',
+
+# '-s', "{}x{}".format(G.width, G.height),
+# '-pix_fmt', 'bgr24',
+
+G.command = ['ffmpeg',
+            '-y',
+            '-re',
+            '-c:v', 'mjpeg',
+            '-r', str(G.fps),
+            '-i', '-',                              # input url from pipe
+            '-pix_fmt', 'yuv420p',                  # output file options
+            '-preset', 'ultrafast',
+            '-c:v', 'libx264',
+            '-bufsize', '64M',
+            '-f', 'flv',
+            '-listen', '1',
+             G.rtmp_url]
+
 # Sorting Packets/Payload Data
 def sortPacket(mypacket, clientid):
     '''
@@ -182,54 +217,96 @@ def sortPacket(mypacket, clientid):
 def socketReceive():
     ' Receive packets via .socket, initialize needed variables '
 
+    # create subprocess to run command and open pipe
+    G.proc = subprocess.Popen(G.command, stdin=subprocess.PIPE, stdout=subprocess.PIPE)
+
     # initialize variables
     BUFF_SIZE = 65536
     server_socket = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-    server_socket.setsockopt(socket.SOL_SOCKET, socket.SO_RCVBUF, BUFF_SIZE)
-    host_name = socket.gethostname()
-    host_ip = socket.gethostbyname(host_name)
-    print(host_ip)
+
+    #host_name = socket.gethostname()
+    #host_ip = socket.gethostbyname(host_name)
+
     port = 10003
 
-    socket_address = (host_ip, port)
+    socket_address = ('', port)
     server_socket.bind(socket_address)
     print('Listening at:', socket_address)
 
-    # receive data from socket
+    expect_frag = 1
+    assembledPayload = b''
+
+    # mclient.listen() # XXX
+
     while True:
+        data, client_addr = server_socket.recvfrom(BUFF_SIZE)
+        hdr = Packet2.parse(data)
 
-        # assuming recvfrom is FIFO
-        # receive first header, unpack, get length of payload
-        payloadLength = 0
-        assembledPayload = bytes('', 'utf-8')
+        # XXX receive data from socket
+        # Move recv to Client2 class - Rename Client2 to something fitting
+        #
+        # result, buffer = mclient.recv()
+        # if result:
+        #    G.proc.stdin.write(buffer)
 
-        incomingPacket = server_socket.recvfrom(BUFF_SIZE)      # in tuple form (buffer, (source_ip, port))
-        header = struct.unpack('!h?8sI', incomingPacket[0])
-        print('Received Header')
-
-        while header[0] != payloadLength:
-
-            receivedPayload = server_socket.recvfrom(BUFF_SIZE)
-            print('Received Payload, header length then payload length:')
-            print(header[0])
-            print(len(receivedPayload[0]))
-
-            # combine current payload with last payload and loop if payload isn't length specified by header
-            payloadLength += len(receivedPayload[0])
-            print(receivedPayload[0])
-            payload = base64.b64decode(receivedPayload[0], ' /')        # conversion to bytes allows for easy conc.(?)
-            assembledPayload += payload
+        # NOTE: assemble payload
+        #   - We can get packets in wrong order
+        #   - Packets can disappear
 
 
-        # check if new client, if so create subprocesses and pipes
-        clientID = header[2].decode('utf-8')
-        if clientID not in config.ClientDict:
+        #print("Header - " + "Type: " + str(hdr.ptype) + " Length: " + str(hdr.payload_length) +
+        #      " Id: " + str(hdr.idcode) + " Pnr: " + str(hdr.packetnumber) + " Fragment: " + str(hdr.fragment) + " Got: " + str(len(data)) + " Data: " + str(hdr.data[0:5]))
 
-            # init both subprocess and write to pipe.stdin
-            sortPacket(assembledPayload, clientID)
+        ## Start of new frame
+        if hdr.ptype == PacketType.Frame:
+            assembledPayload = b''
+            expect_frag = 1
 
-        print('testing recvloop')
+            # Full frame
+            if len(hdr.data) == hdr.payload_length:
+                G.proc.stdin.write(hdr.data)
+            else:
+                assembledPayload += hdr.data
 
+        # More data
+        if hdr.ptype == PacketType.Data:
+            if expect_frag == hdr.fragment:
+                expect_frag += 1
+                assembledPayload += hdr.data
+            else:
+                # We dropped something, just give up this frame
+                assembledPayload = b''
+                expect_frag = 999
+
+            ## XXX Instead of dropping the full frame we could write zeroes/take img data from last frame?
+            #else:
+            #    ## Missing data block, just write some zeroes
+            #    expect_frag += 1
+            #    assembledPayload += b'\x00' * len(hdr.data)
+
+            #    if expect_frag == hdr.fragment:
+            #        expect_frag += 1
+            #        assembledPayload += hdr.data
+            #    else:
+            #        # more missing..
+            #        print("more missing")
+
+        if hdr.ptype == PacketType.DataEnd:
+            if expect_frag == hdr.fragment:
+                assembledPayload += hdr.data
+                G.proc.stdin.write(assembledPayload)
+
+                assembledPayload = b''
+                expect_frag = 1
+
+
+# XXX rename? not really our socketsend?
+# more like a client video reader thing.
+
+# My thought reading original code is we have the components: GUI + Client + Packet
+# Packet - describe data
+# Client - Connect/send
+# GUI - Runs this/initiate
 
 def socketSend(identitycode, serverip=None):
     """
@@ -238,50 +315,42 @@ def socketSend(identitycode, serverip=None):
     Create packet + header class instance using the data
     """
 
-    # initialize variables
-    HOST, PORT = "192.168.1.160", 80
-    packetnumber = 0
-
-    BUFF_SIZE = 65516
-    client_socket = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-    client_socket.setsockopt(socket.SOL_SOCKET, socket.SO_RCVBUF, BUFF_SIZE)
-    host_name = socket.gethostname()
-    host_ip = '192.168.1.192'  # socket.gethostbyname(host_name)
-    port = 10003
-
+    mclient = Client2("127.0.0.1", 10003, identitycode)
     vid = cv.VideoCapture(0)
 
+    # XXX send header info?
     print(vid.get(cv.CAP_PROP_FPS))
     print(vid.get(cv.CAP_PROP_FRAME_WIDTH))
     print(vid.get(cv.CAP_PROP_FRAME_HEIGHT))
 
-    client_socket.connect((host_ip, port))
-
     fps, st, frames_to_count, cnt = (0, 0, 20, 0)
     while True:
-
-        WIDTH = 400
         while vid.isOpened():
             # get video frames, process
-            _, frame = vid.read()
-            frame = imutils.resize(frame, width=WIDTH)
-            encoded, buffer = cv.imencode('.jpg', frame, [cv.IMWRITE_JPEG_QUALITY, 80])
-            message1 = base64.b64encode(buffer)
+            gotFrame, frame = vid.read()
+
+            if gotFrame:
+                frame = imutils.resize(frame, width=G.width, height=G.height)
+                encoded, buffer = cv.imencode('.JPEG', frame, [cv.IMWRITE_JPEG_QUALITY, 80])
+
+                if encoded:
+                    mclient.send(buffer.tobytes())
+            else:
+                break # VideoCapture probably closed
 
             # create packet
-            myPacket = packet.Packet(message1, identitycode, packetnumber)
+            #myPacket = packet.Packet(frame.tobytes(), identitycode, packetnumber)
 
             # send header, then payload
-            myPacket.send(BUFF_SIZE, client_socket, serverip, port, header=True)
-            myPacket.send(BUFF_SIZE, client_socket, serverip, port)
+            #myPacket.send(BUFF_SIZE, client_socket, serverip, port, header=True)
+            #myPacket.send(BUFF_SIZE, client_socket, serverip, port)
 
             frame = cv.putText(frame, 'FPS: ' + str(fps), (10, 40), cv.FONT_HERSHEY_SIMPLEX, 0.7, (0, 0, 255),
                                2)
-            print(frame)
+            #print(frame)
             cv.imshow('TRANSMITTING VIDEO', frame)
             key = cv.waitKey(1) & 0xFF
             if key == ord('q'):
-                client_socket.close()
                 break
             if cnt == frames_to_count:
                 try:
@@ -291,7 +360,6 @@ def socketSend(identitycode, serverip=None):
                 except:
                     pass
             cnt += 1
-            packetnumber += 1
 
 
 # Global Variable issue
@@ -303,8 +371,8 @@ https://towardsdatascience.com/unraveling-pythons-threading-mysteries-e79e001ab4
 #compare with global dict when retrieving it
 #/Lock system would be quicker than having the iterate through a cache.
 
-# Due to how the GIL works: “In order to support multi-threaded Python programs, the interpreter regularly releases 
-and reacquires the lock — by default, every ten bytecode instructions” thus, unless threads are of unequal length, 
+# Due to how the GIL works: “In order to support multi-threaded Python programs, the interpreter regularly releases
+and reacquires the lock — by default, every ten bytecode instructions” thus, unless threads are of unequal length,
 doing the same task, splitting bytewise ends badly.
 Thus locks are needed.
 '''
