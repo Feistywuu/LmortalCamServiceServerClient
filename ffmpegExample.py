@@ -2,9 +2,10 @@ import os
 import subprocess
 import ffmpeg
 import cv2 as cv
-import Functions
 import subprocess
 import numpy as np
+import imutils
+import base64
 
 print(os.getcwd())
 
@@ -17,18 +18,22 @@ rtmp_url = "rtmp://127.0.0.1:1935/live/app"
 vid = cv.VideoCapture(0)
 
 # gather video information for ffmpeg
-fps = int(vid.get(cv.CAP_PROP_FPS))
-width = int(vid.get(cv.CAP_PROP_FRAME_WIDTH))
-height = int(vid.get(cv.CAP_PROP_FRAME_HEIGHT))
+G = lambda: ...
 
+G.fps = int(vid.get(cv.CAP_PROP_FPS))
+G.width = int(vid.get(cv.CAP_PROP_FRAME_WIDTH))
+G.height = int(vid.get(cv.CAP_PROP_FRAME_HEIGHT))
+
+print(str(G.width) + " " + str(G.height) + " " + str(G.fps))
 
 command = ['ffmpeg',
             '-y',
-            '-f', 'rawvideo',                       # global/input options
-            '-vcodec', 'rawvideo',
+            '-re',
+            '-f', 'image2pipe',                            # global/input options
+            '-c:v', 'mjpeg',
             '-pix_fmt', 'bgr24',
-            '-s', "{}x{}".format(width, height),
-            '-r', str(fps),                           # force fps to stated value
+            '-s', "{}x{}".format(G.width, G.height),
+            '-r', str(G.fps),                           # force fps to stated value
             '-i', '-',                              # input url from pipe
             '-pix_fmt', 'yuv420p',                  # output file options
             '-preset', 'ultrafast',
@@ -39,7 +44,7 @@ command = ['ffmpeg',
 
 
 # create subprocess to run command and open pipe
-p = subprocess.Popen(command, stdin=subprocess.PIPE, stdout=subprocess.PIPE)
+p = subprocess.Popen(command, stdin=subprocess.PIPE) # , stdout=subprocess.PIPE)
 
 while vid.isOpened():
 
@@ -47,9 +52,13 @@ while vid.isOpened():
     if not ret:
         print("frame read failed")
         break
-    # write to pipe
-    p.stdin.write(frame.tobytes())
-    print('hi1')
-    p.stdout.readline()
-    print('hi2')
-    # p.stdin.close()
+
+    frame = imutils.resize(frame, width=G.width, height=G.height)
+    encoded, buffer = cv.imencode('.JPEG', frame, [cv.IMWRITE_JPEG_QUALITY, 80])
+
+    if encoded:
+        p.stdin.write(buffer.tobytes())
+
+    # XXX direct
+    # p.stdin.write(frame.tobytes())
+
