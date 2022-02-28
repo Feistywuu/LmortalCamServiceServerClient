@@ -1,11 +1,11 @@
 # UI and main processing loop for server to receive packets and display them.
-
-from queue import *
+# from queue import *
+import sys
 import threading
 import logging
 import Functions
 
-' Plan of action'
+' Plan of action '
 
 # create client ui
 #       show device in UI
@@ -16,7 +16,7 @@ import Functions
 #       display video information
 #       OR just go directly OBS
 
-'Current'
+' Current '
 # get ffmpegg to work on main implementation
 # fix errors with larger packets being partitioned (haven't attempted yet)
 #   /will throw error such as: struct.error: 'h' format requires -32768 <= number <= 32767
@@ -26,16 +26,16 @@ import Functions
 
 
 # need to change file name?
-if __name__ == "__main__":
-
+def main():
     # set variables
-    queue = Queue()
     format1 = "%(asctime)s: %(message)s"
-    logging.basicConfig(format=format1, level=logging.INFO,
-                        datefmt="%H:%M:%S")
+
+    logging.basicConfig(format=format1, level=logging.INFO, datefmt="%H:%M:%S")
 
     # create main socket recv thread
     thrd = threading.Thread(target=Functions.socketReceive())
+
+    return 0
 
     # spawn thread for tkinter gui
     #later
@@ -53,7 +53,10 @@ if __name__ == "__main__":
 #window.geometry("300x200+10+20")
 #window.mainloop()
 
-'later'
-    #IIS on windows 10, app pools
-    #iostream
+' later '
+ #IIS on windows 10, app pools
+ #iostream
 
+
+if __name__ == '__main__':
+    sys.exit(main())
