@@ -3,4 +3,4 @@ from collections import defaultdict
 
 ClientDict = defaultdict(list)
 Threads = []
-
+transmitData = True

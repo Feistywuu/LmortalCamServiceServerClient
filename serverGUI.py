@@ -3,26 +3,12 @@
 import sys
 import threading
 import logging
-import Functions
+import functions
 
 ' Plan of action '
 
-# create client ui
-#       show device in UI
-#       dropdown box for device,quality,port,server ip
-#       receive 'connection established etc' - might require a cookie sent back from server with a variable changed?
-
-# create server ui
-#       display video information
-#       OR just go directly OBS
-
-' Current '
-# get ffmpegg to work on main implementation
-# fix errors with larger packets being partitioned (haven't attempted yet)
-#   /will throw error such as: struct.error: 'h' format requires -32768 <= number <= 32767
 # fix delay to desired amount
 # fix stability issues
-# fps to 30
 
 
 # need to change file name?
@@ -33,7 +19,7 @@ def main():
     logging.basicConfig(format=format1, level=logging.INFO, datefmt="%H:%M:%S")
 
     # create main socket recv thread
-    thrd = threading.Thread(target=Functions.socketReceive())
+    thrd = threading.Thread(target=functions.socketReceive())
 
     return 0
 

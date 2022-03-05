@@ -1,11 +1,7 @@
 import os
-import subprocess
-import ffmpeg
 import cv2 as cv
 import subprocess
-import numpy as np
 import imutils
-import base64
 
 print(os.getcwd())
 
