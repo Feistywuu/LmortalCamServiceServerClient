@@ -15,11 +15,9 @@ from packet import Packet, PacketType
 import config as config
 
 " to work on "
-#/server host and join gui stuff *current*
 #/Implement threading with multiple clients.
 #   / function that inits subprocess and piping for each client, use clientID and put into dict.
-
-# rename socketReceive() > listen()
+# tidy gui
 
 ' vague to do'
 # merge sortpackets with recv
