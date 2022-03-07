@@ -13,7 +13,7 @@ PACKET_STRUCT = '!Ihh?8sI'
 HEADER_SIZE = struct.calcsize(PACKET_STRUCT)
 
 
-class Packet2:
+class Packet:
     def __init__(self, client, data):
         if client:
             self.fragment = 0
@@ -30,7 +30,7 @@ class Packet2:
     @staticmethod
     def parse(data):
         # TODO validate header, or add a def validate()
-        packet = Packet2(None, None)
+        packet = Packet(None, None)
         packet.payload_length, packet.fragment, packet.ptype, packet.udpTrue, packet.idcode, packet.packetnumber = struct.unpack(PACKET_STRUCT, data[:HEADER_SIZE])
         packet.data = data[HEADER_SIZE:]
 
