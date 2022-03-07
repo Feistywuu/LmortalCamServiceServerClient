@@ -3,29 +3,12 @@ import random
 import string
 import socket
 import cv2 as cv
-import imutils
-import time
 import numpy as np
-import subprocess
-import sys
-import errno
-
-from client import Client
-from packet import Packet, PacketType
-import config as config
 
 " to work on "
 #/Implement threading with multiple clients.
 #   / function that inits subprocess and piping for each client, use clientID and put into dict.
 # tidy gui
-
-' vague to do'
-# merge sortpackets with recv
-# move decode/processing to subprocesses - if needed
-# use multiprocessing for gui and socketrecv maybe
-# get vid properties for ffmpeg before info is piped.
-# issue if trouble reading empty stdin.
-
 
 # gui functions
 def getIP():
