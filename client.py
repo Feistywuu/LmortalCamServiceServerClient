@@ -49,7 +49,7 @@ class Client:
         ' Receive packets via .socket, initialize needed variables '
 
         # create subprocess to run command and open pipe
-        G.proc = subprocess.Popen(G.command, stdin=subprocess.PIPE, stdout=subprocess.PIPE)
+        #G.proc = subprocess.Popen(G.command, stdin=subprocess.PIPE, stdout=subprocess.PIPE)
 
         # initialize variables
         BUFF_SIZE = 65536
@@ -69,6 +69,7 @@ class Client:
         while True:
             data, client_addr = server_socket.recvfrom(BUFF_SIZE)
             hdr = Packet.parse(data)
+            ffmpegproc = hdr.validate()
 
             # XXX receive data from socket
             # Move recv to Client2 class - Rename Client2 to something fitting
@@ -91,7 +92,7 @@ class Client:
 
                 # Full frame
                 if len(hdr.data) == hdr.payload_length:
-                    G.proc.stdin.write(hdr.data)
+                    ffmpegproc.stdin.write(hdr.data)
                 else:
                     assembledPayload += hdr.data
 
@@ -121,7 +122,7 @@ class Client:
             if hdr.ptype == PacketType.DataEnd:
                 if expect_frag == hdr.fragment:
                     assembledPayload += hdr.data
-                    G.proc.stdin.write(assembledPayload)
+                    ffmpegproc.stdin.write(assembledPayload)
 
                     assembledPayload = b''
                     expect_frag = 1

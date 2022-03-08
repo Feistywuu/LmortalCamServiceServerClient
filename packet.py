@@ -1,5 +1,8 @@
 import struct
 from enum import IntEnum
+import subprocess
+
+import config
 
 
 class PacketType(IntEnum):
@@ -12,6 +15,32 @@ class PacketType(IntEnum):
 PACKET_STRUCT = '!Ihh?8sI'
 HEADER_SIZE = struct.calcsize(PACKET_STRUCT)
 
+G = lambda: ...
+G.rtmp_url = "rtmp://127.0.0.1:1935/live/app"
+G.fps = 30
+G.width = 640
+G.height = 480
+
+#'-f', 'image2pipe',
+# '-r', str(fps),
+# '-vcodec', 'rawvideo',
+
+# '-s', "{}x{}".format(G.width, G.height),
+# '-pix_fmt', 'bgr24',
+
+G.command = ['ffmpeg',
+            '-y',
+            '-re',
+            '-c:v', 'mjpeg',
+            '-r', str(G.fps),
+            '-i', '-',                              # input url from pipe
+            '-pix_fmt', 'yuv420p',                  # output file options
+            '-preset', 'ultrafast',
+            '-c:v', 'libx264',
+            '-bufsize', '64M',
+            '-f', 'flv',
+            '-listen', '1',
+             G.rtmp_url]
 
 class Packet:
     def __init__(self, client, data):
@@ -29,12 +58,20 @@ class Packet:
 
     @staticmethod
     def parse(data):
-        # TODO validate header, or add a def validate()
         packet = Packet(None, None)
         packet.payload_length, packet.fragment, packet.ptype, packet.udpTrue, packet.idcode, packet.packetnumber = struct.unpack(PACKET_STRUCT, data[:HEADER_SIZE])
         packet.data = data[HEADER_SIZE:]
 
         return packet
+
+    def validate(self):
+        ' Checks contents of packet header, if new clientid create new ffmpeg subproc for it and append to ClientDict'
+        if self.idcode in config.ClientDict.keys():
+            return config.ClientDict[self.idcode]
+        else:
+            G.proc = subprocess.Popen(G.command, stdin=subprocess.PIPE, stdout=subprocess.PIPE)
+            config.ClientDict[self.idcode] = G.proc
+            return G.proc
 
     #def recv
     # header = struct.unpack('!h?8sI', incomingPacket[0])
