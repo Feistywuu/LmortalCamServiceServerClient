@@ -5,10 +5,6 @@ import socket
 import cv2 as cv
 import numpy as np
 
-" to work on "
-#/Implement threading with multiple clients.
-#   / function that inits subprocess and piping for each client, use clientID and put into dict.
-# tidy gui
 
 # gui functions
 def getIP():
@@ -18,18 +14,21 @@ def getIP():
 
 
 def returnCameraIndexes():
+    '''
+
+    :return: arr
+    '''
     # checks the first 10 indexes.
     index = 0
     arr = []
     i = 10
     while i > 0:
-        cap = cv.VideoCapture(index)
+        cap = cv.VideoCapture(index, cv.CAP_DSHOW)
         if cap.read()[0]:
             arr.append(str(index))
             cap.release()
         index += 1
         i -= 1
-    arr.append('None')
     return arr
 
 

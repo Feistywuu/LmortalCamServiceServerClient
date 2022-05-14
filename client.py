@@ -17,6 +17,7 @@ G.height = 480
 
 # '-s', "{}x{}".format(G.width, G.height),
 # '-pix_fmt', 'bgr24',
+# '-tune', 'zerolatency',
 
 G.command = ['ffmpeg',
             '-y',
@@ -159,6 +160,8 @@ class Client:
         vid = cv.VideoCapture(devicenum)
 
         # XXX send header info?
+        vid.set(cv.CAP_PROP_BUFFERSIZE, 3)
+        #CV_CAP_PROP_BUFFERSIZE
         print(vid.get(cv.CAP_PROP_FPS))
         print(vid.get(cv.CAP_PROP_FRAME_WIDTH))
         print(vid.get(cv.CAP_PROP_FRAME_HEIGHT))
@@ -172,6 +175,8 @@ class Client:
                 if gotFrame:
                     frame = imutils.resize(frame, width=G.width, height=G.height)
                     encoded, buffer = cv.imencode('.JPEG', frame, [cv.IMWRITE_JPEG_QUALITY, 80])
+                    print(buffer)
+                    print(len(buffer))
 
                     if encoded and config.transmitData:
                         mclient.send(buffer.tobytes())
